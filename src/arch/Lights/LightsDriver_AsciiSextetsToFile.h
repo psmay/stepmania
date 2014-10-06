@@ -9,6 +9,8 @@ public:
 	LightsDriver_AsciiSextetsToFile();
 	virtual ~LightsDriver_AsciiSextetsToFile();
 	virtual void Set( const LightsState *ls );
+private:
+	void* _impl;
 };
 
 #endif
