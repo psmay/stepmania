@@ -240,7 +240,8 @@ Threads = arch/Threads/Threads.h
 InputHandler += arch/InputHandler/InputHandler_MonkeyKeyboard.cpp arch/InputHandler/InputHandler_MonkeyKeyboard.h
 
 Lights += arch/Lights/LightsDriver_Export.cpp arch/Lights/LightsDriver_Export.h \
-	arch/Lights/LightsDriver_SystemMessage.cpp arch/Lights/LightsDriver_SystemMessage.h
+	arch/Lights/LightsDriver_SystemMessage.cpp arch/Lights/LightsDriver_SystemMessage.h \
+	arch/Lights/LightsDriver_AsciiSextetsToFile.cpp arch/Lights/LightsDriver_AsciiSextetsToFile.h
 
 LoadingWindow += arch/LoadingWindow/LoadingWindow_Null.h
 
