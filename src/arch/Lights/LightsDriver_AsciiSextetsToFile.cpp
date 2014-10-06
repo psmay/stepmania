@@ -122,7 +122,7 @@ inline size_t packControllerLights(const LightsState *ls, GameController gc, uin
 
 // No, I don't know why I used the pimpl idiom here. It just is.
 
-namespace _LightsDriver_AsciiSextetsToFile_Impl
+namespace
 {
 	class Impl
 	{
@@ -190,15 +190,13 @@ LightsDriver_AsciiSextetsToFile::LightsDriver_AsciiSextetsToFile()
 
 LightsDriver_AsciiSextetsToFile::~LightsDriver_AsciiSextetsToFile()
 {
-	_LightsDriver_AsciiSextetsToFile_Impl::Impl * impl =
-		(_LightsDriver_AsciiSextetsToFile_Impl::Impl)(this->_impl);
+	Impl* impl = (Impl*)(this->_impl);
 	delete impl;
 }
 
 void LightsDriver_AsciiSextetsToFile::Set( const LightsState *ls )
 {
-	_LightsDriver_AsciiSextetsToFile_Impl::Impl * impl =
-		(_LightsDriver_AsciiSextetsToFile_Impl::Impl)(this->_impl);
+	Impl* impl = (Impl*)(this->_impl);
 	impl->Set(ls);
 }
 
