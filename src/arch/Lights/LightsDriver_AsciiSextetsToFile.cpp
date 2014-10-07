@@ -1,5 +1,6 @@
 #include "global.h"
 #include "LightsDriver_AsciiSextetsToFile.h"
+#include "PrefsManager.h"
 #include "RageLog.h"
 
 #include <cstdio>
@@ -7,9 +8,6 @@
 #include <cerrno>
 
 using namespace std;
-
-//TODO: Make filename a preference instead
-static const char * ASCII_SEXTETS_FILE = "/tmp/sextets.out";
 
 // Number of printable characters used to encode lights
 static const size_t CABINET_SEXTET_COUNT = 1;
@@ -138,12 +136,14 @@ namespace
 	private:
 		void doOutput(uint8_t*, size_t);
 		FILE* outputFile;
-		uint8_t lastOutput[FULL_SEXTET_COUNT] = { 0 };
+		uint8_t lastOutput[FULL_SEXTET_COUNT];
 	};
 
 	Impl::Impl()
 	{
-		outputFile = fopen(ASCII_SEXTETS_FILE, "ab");
+		lastOutput[0] = 0x00;
+
+		outputFile = fopen((RString)PREFSMAN->m_sLights_AsciiSextetsToFile_OutputFilename, "ab");
 		if(outputFile == NULL)
 		{
 			LOG->Warn("Error opening file for Ascii sextet output: %d %s", errno, strerror(errno));
