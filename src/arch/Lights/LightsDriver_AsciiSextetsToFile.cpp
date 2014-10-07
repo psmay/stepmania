@@ -3,6 +3,8 @@
 #include "RageLog.h"
 
 #include <cstdio>
+#include <cstring>
+#include <cerrno>
 
 using namespace std;
 
@@ -12,6 +14,9 @@ static const char * ASCII_SEXTETS_FILE = "/tmp/sextets.out";
 // Number of printable characters used to encode lights
 static const size_t CABINET_SEXTET_COUNT = 1;
 static const size_t CONTROLLER_SEXTET_COUNT = 6;
+
+// Number of bytes to contain the full pack and a trailing LF
+static const size_t FULL_SEXTET_COUNT = CABINET_SEXTET_COUNT + (NUM_GameController * CONTROLLER_SEXTET_COUNT) + 1;
 
 // Encodes the low 6 bits of a byte as a printable, non-space ASCII
 // character (i.e., within the range 0x21-0x7E) such that the low 6 bits of
@@ -133,6 +138,7 @@ namespace
 	private:
 		void doOutput(uint8_t*, size_t);
 		FILE* outputFile;
+		uint8_t lastOutput[FULL_SEXTET_COUNT] = { 0 };
 	};
 
 	Impl::Impl()
@@ -155,9 +161,8 @@ namespace
 	void Impl::Set(const LightsState* ls)
 	{
 		// We include an extra byte for a line ending.
-		uint8_t buffer[CABINET_SEXTET_COUNT + (NUM_GameController * CONTROLLER_SEXTET_COUNT) + 1];
+		uint8_t buffer[FULL_SEXTET_COUNT];
 		size_t index = 0;
-		size_t gcIndex = 0;
 
 		index += packCabinetLights(ls, &(buffer[index]));
 		FOREACH_ENUM(GameController, gc)
@@ -168,7 +173,14 @@ namespace
 		// Add newline (LF) to delimit the value.
 		buffer[index++] = 0xA;
 
-		doOutput(impl, buffer, index);
+		// Only write out if the message changed
+		if(memcmp(buffer, lastOutput, FULL_SEXTET_COUNT) != 0)
+		{
+			doOutput(buffer, index);
+
+			// Remember the last message
+			memcpy(lastOutput, buffer, FULL_SEXTET_COUNT);
+		}
 	}
 
 	void Impl::doOutput(uint8_t* data, size_t count)
