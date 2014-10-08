@@ -1,5 +1,5 @@
 #include "global.h"
-#include "LightsDriver_AsciiSextetsToFile.h"
+#include "LightsDriver_SextetStream.h"
 #include "PrefsManager.h"
 #include "RageLog.h"
 
@@ -15,6 +15,9 @@ static const size_t CONTROLLER_SEXTET_COUNT = 6;
 
 // Number of bytes to contain the full pack and a trailing LF
 static const size_t FULL_SEXTET_COUNT = CABINET_SEXTET_COUNT + (NUM_GameController * CONTROLLER_SEXTET_COUNT) + 1;
+
+
+// Serialization routines
 
 // Encodes the low 6 bits of a byte as a printable, non-space ASCII
 // character (i.e., within the range 0x21-0x7E) such that the low 6 bits of
@@ -33,7 +36,7 @@ inline uint8_t printableSextet(uint8_t data)
 	// Put another way, the top 4 bits H of the output are determined from
 	// the top two bits T of the input like so:
 	// 	H = ((T + 1) mod 4) + 3
-	
+
 	return ((data + (uint8_t)0x10) & (uint8_t)0x3F) + (uint8_t)0x30;
 }
 
@@ -123,93 +126,161 @@ inline size_t packControllerLights(const LightsState *ls, GameController gc, uin
 	return CONTROLLER_SEXTET_COUNT;
 }
 
-// No, I don't know why I used the pimpl idiom here. It just is.
+inline size_t packLine(uint8_t * buffer, const LightsState* ls)
+{
+	size_t index = 0;
+
+	index += packCabinetLights(ls, &(buffer[index]));
+
+	FOREACH_ENUM(GameController, gc)
+	{
+		index += packControllerLights(ls, gc, &(buffer[index]));
+	}
+
+	// Terminate with LF
+	buffer[index++] = 0xA;
+
+	return index;
+}
+
+
+// Base classes
 
 namespace
 {
-	class Impl
+	// Abstract class: writes bytes from an array to a stream.
+	class OutputStream
 	{
 	public:
-		Impl();
-		~Impl();
-		void Set( const LightsState *ls );
-	private:
-		void doOutput(uint8_t*, size_t);
-		FILE* outputFile;
-		uint8_t lastOutput[FULL_SEXTET_COUNT];
+		OutputStream() {}
+		virtual ~OutputStream() {}
+		virtual void Write(uint8_t * data, size_t length) = 0;
 	};
 
-	Impl::Impl()
+	// Abstract class: instantiates an OutputStream and writes light data to it.
+	class Impl
 	{
-		lastOutput[0] = 0x00;
+	protected:
+		uint8_t lastOutput[FULL_SEXTET_COUNT];
+		OutputStream * out;
+	public:
+		Impl() {
+			// Ensure a non-match the first time
+			lastOutput[0] = 0;
+		};
+		virtual ~Impl() {};
 
-		outputFile = fopen((RString)PREFSMAN->m_sLights_AsciiSextetsToFile_OutputFilename, "ab");
-		if(outputFile == NULL)
+		void Set(const LightsState * ls)
 		{
-			LOG->Warn("Error opening file for Ascii sextet output: %d %s", errno, strerror(errno));
-		}
-	}
+			uint8_t buffer[FULL_SEXTET_COUNT];
+			size_t index = 0;
 
-	Impl::~Impl()
+			index = packLine(buffer, ls);
+
+			// Only write if the message has changed since the last write.
+			if(memcmp(buffer, lastOutput, FULL_SEXTET_COUNT) != 0)
+			{
+				out->Write(buffer, FULL_SEXTET_COUNT);
+				// Remember last message
+				memcpy(lastOutput, buffer, FULL_SEXTET_COUNT);
+			}
+		}
+	};
+}
+
+#define IMPL ((Impl*)_impl)
+
+LightsDriver_SextetStream::LightsDriver_SextetStream()
+{
+	_impl = NULL;
+}
+
+LightsDriver_SextetStream::~LightsDriver_SextetStream()
+{
+	if(IMPL != NULL)
 	{
-		if(outputFile != NULL)
-		{
-			fclose(outputFile);
-		}
-	}
-
-	void Impl::Set(const LightsState* ls)
-	{
-		// We include an extra byte for a line ending.
-		uint8_t buffer[FULL_SEXTET_COUNT];
-		size_t index = 0;
-
-		index += packCabinetLights(ls, &(buffer[index]));
-		FOREACH_ENUM(GameController, gc)
-		{
-			index += packControllerLights(ls, gc, &(buffer[index]));
-		}
-
-		// Add newline (LF) to delimit the value.
-		buffer[index++] = 0xA;
-
-		// Only write out if the message changed
-		if(memcmp(buffer, lastOutput, FULL_SEXTET_COUNT) != 0)
-		{
-			doOutput(buffer, index);
-
-			// Remember the last message
-			memcpy(lastOutput, buffer, FULL_SEXTET_COUNT);
-		}
-	}
-
-	void Impl::doOutput(uint8_t* data, size_t count)
-	{
-		if(outputFile != NULL) {
-			fwrite(data, sizeof(uint8_t), count, outputFile);
-			// Flush immediately
-			fflush(outputFile);
-		}
+		delete IMPL;
 	}
 }
 
-REGISTER_SOUND_DRIVER_CLASS(AsciiSextetsToFile);
-
-LightsDriver_AsciiSextetsToFile::LightsDriver_AsciiSextetsToFile()
+void LightsDriver_SextetStream::Set(const LightsState *ls)
 {
-	this->_impl = new Impl();
+	if(IMPL != NULL)
+	{
+		IMPL->Set(ls);
+	}
 }
 
-LightsDriver_AsciiSextetsToFile::~LightsDriver_AsciiSextetsToFile()
+
+// Concrete implementations
+
+// LightsDriver_SextetStreamToFile
+
+REGISTER_SOUND_DRIVER_CLASS(SextetStreamToFile);
+
+#if defined(_WINDOWS)
+	#define DEFAULT_OUTPUT_FILENAME "\\\\.\\pipe\\StepMania-Lights-SextetStream"
+#else
+	#define DEFAULT_OUTPUT_FILENAME "Data/StepMania-Lights-SextetStream.out"
+#endif
+static Preference<RString> g_sSextetStreamOutputFilename("SextetStreamOutputFilename", DEFAULT_OUTPUT_FILENAME);
+
+namespace
 {
-	Impl* impl = (Impl*)(this->_impl);
-	delete impl;
+	// For (C-based) file output
+	class FileOutputStream : public OutputStream
+	{
+	private:
+		FILE* file;
+	public:
+		FileOutputStream(const RString& filename)
+		{
+			file = fopen(filename.c_str(), "ab");
+			if(file == NULL)
+			{
+				LOG->Warn("Error opening file '%s' for sextet stream output: %d %s", filename.c_str(), errno, strerror(errno));
+			}
+		}
+		~FileOutputStream()
+		{
+			if(file != NULL)
+			{
+				fflush(file);
+				fclose(file);
+			}
+		}
+		void Write(uint8_t * data, size_t length)
+		{
+			if(file != NULL)
+			{
+				fwrite(data, sizeof(uint8_t), length, file);
+				fflush(file);
+			}
+		}
+	};
+
+	class FileImpl : public Impl
+	{
+	public:
+		FileImpl(const RString& filename)
+		{
+			out = new FileOutputStream(filename);
+		}
+		virtual ~FileImpl()
+		{
+			delete out;
+		}
+	};
 }
 
-void LightsDriver_AsciiSextetsToFile::Set( const LightsState *ls )
+LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(const RString& filename)
 {
-	Impl* impl = (Impl*)(this->_impl);
-	impl->Set(ls);
+	_impl = new FileImpl(filename);
+}
+
+LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
+{
+	_impl = new FileImpl(g_sSextetStreamOutputFilename);
 }
 
 /*

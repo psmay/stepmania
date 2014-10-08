@@ -288,17 +288,6 @@ public:
 	Preference<bool>	m_bThreadedMovieDecode;
 	Preference<RString>	m_sTestInitialScreen;
 	Preference<bool>	m_bDebugLights;
-
-	// PSM: It would be way better to have a
-	// `[Lights-AsciiSextetsToFile]` section in the INI with an
-	// `OutputFilename=` variable, and to be able to get at it with
-	// something not too unlike:
-	//	Preference<RString>::GetSectionPreferenceByName(
-	// 		"Lights-AsciiSextetsToFile","OutputFilename")
-	// but I'm not familiar enough with the INI code, so here's this
-	// instead.
-	Preference<RString>	m_sLights_AsciiSextetsToFile_OutputFilename;
-
 	Preference<bool>	m_bMonkeyInput;
 	Preference<RString>	m_sMachineName;
 	Preference<RString>	m_sCoursesToShowRanking;

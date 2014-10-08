@@ -281,11 +281,6 @@ PrefsManager::PrefsManager() :
 	m_bThreadedMovieDecode		( "ThreadedMovieDecode",		true ),
 	m_sTestInitialScreen		( "TestInitialScreen",			"" ),
 	m_bDebugLights			( "DebugLights",			false ),
-
-	// TODO: Find a more consistent place for this
-	m_sLights_AsciiSextetsToFile_OutputFilename
-					( "Lights_AsciiSextetsToFile_OutputFilename", "Data/sextets.out" ),
-
 	m_bMonkeyInput			( "MonkeyInput",			false ),
 	m_sMachineName			( "MachineName",			"" ),
 	m_sCoursesToShowRanking		( "CoursesToShowRanking",		"" ),

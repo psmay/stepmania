@@ -1,16 +1,36 @@
-#ifndef LightsDriver_AsciiSextetsToFile_H
-#define LightsDriver_AsciiSextetsToFile_H
+#ifndef LightsDriver_SextetStream_H
+#define LightsDriver_SextetStream_H
+
+/*
+ * `LightsDriver_SextetStream` (abstract): Streams the light data (in
+ * ASCII-safe sextets) to some output stream.
+ *
+ * *   `LightsDriver_SextetStreamToFile`: Streams the light data to an
+ *     output file.
+ *     *   The specified file may be a named pipe (Windows)/named fifo
+ *         (Linux, others). This makes it possible to implement an
+ *         out-of-process light controller without touching the StepMania
+ *         source and without using C++. See the included notes for
+ *         details.
+ */
 
 #include "LightsDriver.h"
 
-class LightsDriver_AsciiSextetsToFile : public LightsDriver
+class LightsDriver_SextetStream : public LightsDriver
 {
 public:
-	LightsDriver_AsciiSextetsToFile();
-	virtual ~LightsDriver_AsciiSextetsToFile();
-	virtual void Set( const LightsState *ls );
-private:
-	void* _impl;
+	LightsDriver_SextetStream();
+	virtual ~LightsDriver_SextetStream();
+	virtual void Set(const LightsState *ls);
+protected:
+	void * _impl;
+};
+
+class LightsDriver_SextetStreamToFile : public LightsDriver_SextetStream
+{
+public:
+	LightsDriver_SextetStreamToFile();
+	LightsDriver_SextetStreamToFile(const RString& filename);
 };
 
 #endif

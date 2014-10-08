@@ -241,7 +241,7 @@ InputHandler += arch/InputHandler/InputHandler_MonkeyKeyboard.cpp arch/InputHand
 
 Lights += arch/Lights/LightsDriver_Export.cpp arch/Lights/LightsDriver_Export.h \
 	arch/Lights/LightsDriver_SystemMessage.cpp arch/Lights/LightsDriver_SystemMessage.h \
-	arch/Lights/LightsDriver_AsciiSextetsToFile.cpp arch/Lights/LightsDriver_AsciiSextetsToFile.h
+	arch/Lights/LightsDriver_SextetStream.cpp arch/Lights/LightsDriver_SextetStream.h
 
 LoadingWindow += arch/LoadingWindow/LoadingWindow_Null.h
 
