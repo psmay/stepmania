@@ -8,14 +8,20 @@ Quick start
 -----------
 
 You'll need a working StepMania build with this LightsDriver enabled.
-For this test, you'll also need some sample programs (TODO: actually
-write and provide `SextetStreamStdinTest.pl`,
-`SextetStreamStdinTest.wsf`, `SextetStreamNamedPipeTest.wsf`) to test
-the output. In Windows, stdin-based lighting programs will also need
-[`createAndReadPipe`](https://github.com/psmay/createAndReadPipe/releases)
-or a similar named-to-stdout bridge.
+For this test, you'll also need some sample programs to test the output:
+
+These `SextetStreamStdinTest` scripts are simple examples of *lighting
+programs*, programs that will receive input from StepMania and produce
+output on physical lights. Because these scripts are for testing and
+diagnostics, their "light output" is text in a console window. Actual
+lighting programs receive input in the same way, but will do different
+things with the output.
 
 ### Linux
+
+You'll need the perl script
+[`SextetStreamStdinTest.pl`](https://gist.github.com/psmay/7f45a867c1ae8f88ec36#file-sextetstreamstdintest-pl).
+Set the executable bit (`chmod ug+x SextetStreamStdinTest.pl`).
 
 We assume that `$SM` is the root StepMania directory.
 
@@ -32,7 +38,7 @@ Run the test stdin-based lighting program, using the FIFO as input:
 
     ./SextetStreamStdinTest.pl < "$SM/Data/StepMania-Lights-SextetStream.out"
 
-While the lighting program is running, start StepMania. (When using a
+While the lighting program is running, start StepMania. (When using the
 test lighting program, windowed mode may be needed to keep the program
 visible.) The lighting program should display the light information.
 
@@ -40,6 +46,14 @@ When StepMania closes, the FIFO connection ends, causing the lighting
 program to exit as well.
 
 ### Windows
+
+You'll need:
+
+*   The Windows Script Host script
+    [`SextetStreamStdinTest.wsf`](https://gist.github.com/psmay/7f45a867c1ae8f88ec36#file-sextetstreamstdintest-wsf),
+    the lighting program
+*   [`createAndReadPipe`](https://github.com/psmay/createAndReadPipe/releases),
+    to work with a named pipe from the console.
 
 In `Preferences.ini`, set:
 
@@ -49,13 +63,9 @@ In `Preferences.ini`, set:
 Use `createAndReadPipe` to create the named pipe, feeding the output
 into the test stdin-based lighting program:
 
-    createAndReadPipe StepMania-Lights-SextetStream | cscript SextetStreamStdinTest.wsf
+    createAndReadPipe StepMania-Lights-SextetStream | cscript //nologo SextetStreamStdinTest.wsf
 
-Or, run a lighting program that uses the pipe directly:
-
-    cscript SextetStreamNamedPipeTest.wsf StepMania-Lights-SextetStream
-
-While the lighting program is running, start StepMania. (When using a
+While the lighting program is running, start StepMania. (When using the
 test lighting program, windowed mode may be needed to keep the program
 visible.) The lighting program should display the light information.
 

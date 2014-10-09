@@ -2,10 +2,9 @@
 #include "LightsDriver_SextetStream.h"
 #include "PrefsManager.h"
 #include "RageLog.h"
+#include "RageUtil.h"
 
-#include <cstdio>
 #include <cstring>
-#include <cerrno>
 
 using namespace std;
 
@@ -144,31 +143,37 @@ inline size_t packLine(uint8_t * buffer, const LightsState* ls)
 }
 
 
-// Base classes
+
+// Private members/methods are kept out of the header using an opaque pointer `_impl`.
+// Google "pimpl idiom" for an explanation of what's going on and why it is (or might be) useful.
+
+
+// Implementation class
 
 namespace
 {
-	// Abstract class: writes bytes from an array to a stream.
-	class OutputStream
-	{
-	public:
-		OutputStream() {}
-		virtual ~OutputStream() {}
-		virtual void Write(uint8_t * data, size_t length) = 0;
-	};
-
-	// Abstract class: instantiates an OutputStream and writes light data to it.
 	class Impl
 	{
 	protected:
 		uint8_t lastOutput[FULL_SEXTET_COUNT];
-		OutputStream * out;
+		RageFile * out;
+
 	public:
-		Impl() {
+		Impl(RageFile * file) {
+			out = file;
+
 			// Ensure a non-match the first time
 			lastOutput[0] = 0;
-		};
-		virtual ~Impl() {};
+		}
+
+		virtual ~Impl() {
+			if(out != NULL)
+			{
+				out->Flush();
+				out->Close();
+				SAFE_DELETE(out);
+			}
+		}
 
 		void Set(const LightsState * ls)
 		{
@@ -180,13 +185,22 @@ namespace
 			// Only write if the message has changed since the last write.
 			if(memcmp(buffer, lastOutput, FULL_SEXTET_COUNT) != 0)
 			{
-				out->Write(buffer, FULL_SEXTET_COUNT);
+				if(out != NULL)
+				{
+					out->Write(buffer, FULL_SEXTET_COUNT);
+					out->Flush();
+				}
+
 				// Remember last message
 				memcpy(lastOutput, buffer, FULL_SEXTET_COUNT);
 			}
 		}
 	};
 }
+
+
+// LightsDriver_SextetStream interface
+// (Wrapper for Impl)
 
 #define IMPL ((Impl*)_impl)
 
@@ -212,9 +226,7 @@ void LightsDriver_SextetStream::Set(const LightsState *ls)
 }
 
 
-// Concrete implementations
-
-// LightsDriver_SextetStreamToFile
+// LightsDriver_SextetStreamToFile implementation
 
 REGISTER_SOUND_DRIVER_CLASS(SextetStreamToFile);
 
@@ -225,62 +237,28 @@ REGISTER_SOUND_DRIVER_CLASS(SextetStreamToFile);
 #endif
 static Preference<RString> g_sSextetStreamOutputFilename("SextetStreamOutputFilename", DEFAULT_OUTPUT_FILENAME);
 
-namespace
+LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(RageFile * file)
 {
-	// For (C-based) file output
-	class FileOutputStream : public OutputStream
-	{
-	private:
-		FILE* file;
-	public:
-		FileOutputStream(const RString& filename)
-		{
-			file = fopen(filename.c_str(), "ab");
-			if(file == NULL)
-			{
-				LOG->Warn("Error opening file '%s' for sextet stream output: %d %s", filename.c_str(), errno, strerror(errno));
-			}
-		}
-		~FileOutputStream()
-		{
-			if(file != NULL)
-			{
-				fflush(file);
-				fclose(file);
-			}
-		}
-		void Write(uint8_t * data, size_t length)
-		{
-			if(file != NULL)
-			{
-				fwrite(data, sizeof(uint8_t), length, file);
-				fflush(file);
-			}
-		}
-	};
-
-	class FileImpl : public Impl
-	{
-	public:
-		FileImpl(const RString& filename)
-		{
-			out = new FileOutputStream(filename);
-		}
-		virtual ~FileImpl()
-		{
-			delete out;
-		}
-	};
+	_impl = new Impl(file);
 }
 
 LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(const RString& filename)
 {
-	_impl = new FileImpl(filename);
+	RageFile * file = new RageFile;
+
+	if(!file->Open(filename, RageFile::WRITE|RageFile::STREAMED))
+	{
+		LOG->Warn("Error opening file '%s' for output: %s", filename.c_str(), file->GetError().c_str());
+		SAFE_DELETE(file);
+		file = NULL;
+	}
+
+	_impl = new Impl(file);
 }
 
 LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
 {
-	_impl = new FileImpl(g_sSextetStreamOutputFilename);
+	_impl = new Impl(g_sSextetStreamOutputFilename);
 }
 
 /*

@@ -15,6 +15,7 @@
  */
 
 #include "LightsDriver.h"
+#include "RageFile.h"
 
 class LightsDriver_SextetStream : public LightsDriver
 {
@@ -31,6 +32,10 @@ class LightsDriver_SextetStreamToFile : public LightsDriver_SextetStream
 public:
 	LightsDriver_SextetStreamToFile();
 	LightsDriver_SextetStreamToFile(const RString& filename);
+
+	// The file object passed here will be flushed, closed, and deleted in
+	// the destructor.
+	LightsDriver_SextetStreamToFile(RageFile * file);
 };
 
 #endif
