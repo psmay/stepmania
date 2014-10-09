@@ -33,8 +33,8 @@ public:
 	LightsDriver_SextetStreamToFile();
 	LightsDriver_SextetStreamToFile(const RString& filename);
 
-	// The file object passed here will be flushed, closed, and deleted in
-	// the destructor.
+	// The file object passed here should already be open, and will be
+	// flushed, closed, and deleted in the destructor.
 	LightsDriver_SextetStreamToFile(RageFile * file);
 };
 
