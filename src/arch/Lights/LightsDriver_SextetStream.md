@@ -8,7 +8,8 @@ Quick start
 -----------
 
 You'll need a working StepMania build with this LightsDriver enabled.
-For this test, you'll also need some sample programs to test the output:
+For this test, you'll also need some sample programs to test the output
+(see below).
 
 These `SextetStreamStdinTest` scripts are simple examples of *lighting
 programs*, programs that will receive input from StepMania and produce
