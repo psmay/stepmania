@@ -1,22 +1,32 @@
 `LightsDriver_SextetStream_*`
 =============================
 
-This is a set of drivers that encode light states as text and streams
-the result to the desired output.
+Explanation
+-----------
+
+This is a set of drivers (currently, just one driver) that encode light
+states as text and stream the result to the desired output. By making
+the light data available as a readable stream, light control can be
+performed by another program. Such a program can be implemented using
+any language/platform that supports driving the desired output device
+(and reading from an input stream). If C++ isn't your thing, or if
+learning the guts of StepMania seems a little much just to implement a
+lights driver, you're in the right place.
 
 Quick start
 -----------
 
-You'll need a working StepMania build with this LightsDriver enabled.
-For this test, you'll also need some sample programs to test the output
-(see below).
+You'll need a working StepMania build with the driver
+`LightsDriver_SextetStreamToFile` enabled.
 
-These `SextetStreamStdinTest` scripts are simple examples of *lighting
-programs*, programs that will receive input from StepMania and produce
-output on physical lights. Because these scripts are for testing and
-diagnostics, their "light output" is text in a console window. Actual
-lighting programs receive input in the same way, but will do different
-things with the output.
+For this test, you'll run a script, `SextetStreamStdinTest`, to verify
+that the driver is set up properly. The script is a simple example of a
+*lighting program*, a program that will receive input from StepMania and
+produce output using the data. Because the script is for testing and
+diagnostics, the is text in a console window. Actual lighting programs
+receive input in the same way, but will do different things with the
+output, such as sending commands out over a hardware interface
+(serial/parallel/USB) to control physical lights.
 
 ### Linux
 
