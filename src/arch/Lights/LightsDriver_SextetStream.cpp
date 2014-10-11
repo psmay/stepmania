@@ -178,9 +178,8 @@ namespace
 		void Set(const LightsState * ls)
 		{
 			uint8_t buffer[FULL_SEXTET_COUNT];
-			size_t index = 0;
 
-			index = packLine(buffer, ls);
+			packLine(buffer, ls);
 
 			// Only write if the message has changed since the last write.
 			if(memcmp(buffer, lastOutput, FULL_SEXTET_COUNT) != 0)
@@ -237,12 +236,7 @@ REGISTER_SOUND_DRIVER_CLASS(SextetStreamToFile);
 #endif
 static Preference<RString> g_sSextetStreamOutputFilename("SextetStreamOutputFilename", DEFAULT_OUTPUT_FILENAME);
 
-LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(RageFile * file)
-{
-	_impl = new Impl(file);
-}
-
-LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(const RString& filename)
+inline RageFile * openOutputStream(const RString& filename)
 {
 	RageFile * file = new RageFile;
 
@@ -253,12 +247,22 @@ LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(const RString& 
 		file = NULL;
 	}
 
+	return file;
+}
+
+LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(RageFile * file)
+{
 	_impl = new Impl(file);
+}
+
+LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(const RString& filename)
+{
+	_impl = new Impl(openOutputStream(filename));
 }
 
 LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
 {
-	_impl = new Impl(g_sSextetStreamOutputFilename);
+	_impl = new Impl(openOutputStream(g_sSextetStreamOutputFilename));
 }
 
 /*
