@@ -56,6 +56,21 @@ visible.) The lighting program should display the light information.
 When StepMania closes, the FIFO connection ends, causing the lighting
 program to exit as well.
 
+#### Serial port under Linux
+
+If you have a microcontroller running firmware that understands the
+SextetStream protocol, you can use `socat` as the lighting program to
+pipe the data directly to the device via a serial port:
+
+    socat "$SM/Data/StepMania-Lights-SextetStream.out" /dev/ttyUSB0,raw,echo=0,b115200
+
+Substitute your actual serial port device for `/dev/ttyUSB0` and the
+actual port speed for `115200`. (But note that running at too low a
+speed may result in the output blocking, causing StepMania to freeze or
+stutter).
+
+Watch this space for example PIC and/or Arduino firmware.
+
 ### Windows
 
 You'll need:
