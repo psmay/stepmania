@@ -1,120 +1,271 @@
-// This placeholder is just a copy of InputHandler_MonkeyKeyboard with some names changed
 #include "global.h"
 #include "InputHandler_SextetStream.h"
 #include "RageUtil.h"
 #include "PrefsManager.h"
+#include "RageThreads.h"
 
+// In so many words, ceil(n/6).
+#define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
+
+#define _DEVICE DEVICE_JOY1
+#define DEFAULT_TIMEOUT_MS 1000
+#define BUTTON_COUNT 64
+#define STATE_BUFFER_SIZE NUMBER_OF_SEXTETS_FOR_BIT_COUNT(BUTTON_COUNT)
+
+namespace
+{
+	class Impl
+	{
+	public:
+		uint8_t stateBuffer[STATE_BUFFER_SIZE];
+		size_t timeout_ms = DEFAULT_TIMEOUT_MS;
+
+		RageThread inputThread;
+		bool continueInputThread = false;
+
+		static int StartInputThread(void * p)
+		{
+			((Impl*)p)->RunInputThread();
+			return 0;
+		}
+
+		inline void GetNewState(uint8_t * buffer, RString& line)
+		{
+			size_t lineLen = line.length();
+			size_t i, cursor;
+			cursor = 0;
+			memset(buffer, 0, STATE_BUFFER_SIZE);
+			for(i = 0; i < lineLen; ++i) {
+				char b = line[i];
+				if((b >= 0x30) && (b <= 0x6F)) {
+					buffer[cursor++] = b & 0x3F;
+					if(cursor >= STATE_BUFFER_SIZE) {
+						break;
+					}
+				}
+			}
+		}
+
+		inline DeviceButton JoyButtonAtIndex(size_t index)
+		{
+			return enum_add2(JOY_BUTTON_1, index);
+		}
+
+		inline void ReactToChanges(const uint8_t * newStateBuffer)
+		{
+			InputDevice id = InputDevice(_DEVICE);
+			uint8_t changes[STATE_BUFFER_SIZE];
+			RageTimer now;
+
+			// XOR to find differences
+			for(size_t i = 0; i < STATE_BUFFER_SIZE; ++i) {
+				changes[i] = stateBuffer[i] ^ newStateBuffer[i];
+			}
+
+			// Report on changes
+			for(size_t m = 0; m < STATE_BUFFER_SIZE; ++m) {
+				for(size_t n = 0; n < 6; ++n) {
+					size_t bi = (m * 6) + n;
+					if(bi < BUTTON_COUNT) {
+						if(changes[m] & (1 << n)) {
+							bool value = newStateBuffer[m] & (1 << n);
+							ButtonPressed(DeviceInput(id, JoyButtonAtIndex(bi), value, now));
+						}
+					}
+				}
+			}
+
+			// Update current state
+			memcpy(stateBuffer, newStateBuffer, STATE_BUFFER_SIZE);
+		}
+
+
+		void RunInputThread()
+		{
+			InputDevice id;
+			RString line;
+
+			while(continueInputThread) {
+				if(ReadLine(line)) {
+					if(line.length() > 0) {
+						uint8_t newStateBuffer[STATE_BUFFER_SIZE];
+						GetNewState(newStateBuffer, line);
+						ReactToChanges(newStateBuffer);
+					}
+				}
+				else {
+					// Error or EOF condition.
+					continueInputThread = false;
+				}
+			}
+		}
+
+		// Ideally, this method should return if timeout_ms passes before a
+		// line becomes available. Actually doing this may require some
+		// platform-specific non-blocking read capability. This sort of
+		// thing could be implemented using e.g. POSIX select() and Windows
+		// GetOverlappedResultEx(), both of which have timeout parameters.
+		// (I get the sense that the RageFileDriverTimeout class could be
+		// convinced to work, but there isn't a lot of code using it, so I'm
+		// lacking the proper examples.)
+		//
+		// If this method does block, almost everything will still work, but
+		// the blocking may prevent the loop from checking
+		// continueInputThread in a timely fashion. If the stream ceases to
+		// produce new data before this object is destroyed, the current
+		// thread will hang until the other side of the connection closes
+		// the stream (or produces a line of data). A workaround for that
+		// would be to have the far side of the connection repeat its last
+		// line every second or so as a keepalive.
+		//
+		// false (line unchanged) if there is an error or EOF condition,
+		// true (line = next line from stream) if a whole line is available,
+		// true (line = "") if no error but still waiting for next line.
+		virtual bool ReadLine(RString& line) = 0;
+
+		Impl()
+		{
+			memset(stateBuffer, 0, STATE_BUFFER_SIZE);
+			inputThread.SetName("SextetStream input thread");
+			inputThread.Create(StartInputThread, this);
+		}
+
+		virtual ~Impl()
+		{
+			if(inputThread.IsCreated())
+			{
+				continueInputThread = false;
+				inputThread.Wait();
+			}
+		}
+
+		virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
+		{
+			vDevicesOut.push_back(InputDeviceInfo(_DEVICE, "SextetStream"));
+		}
+	};
+}
+
+inline Impl * impl(InputHandler_SextetStream * _this)
+{
+	return (Impl*)(_this->_impl);
+}
+
+void InputHandler_SextetStream::GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
+{
+	if(impl(this)) {
+		impl(this)->GetDevicesAndDescriptions(vDevicesOut);
+	}
+}
 
 InputHandler_SextetStream::InputHandler_SextetStream()
 {
-	m_dbLast = DeviceButton_Invalid;
+	_impl = NULL;
 }
 
 InputHandler_SextetStream::~InputHandler_SextetStream()
 {
-}
-
-void InputHandler_SextetStream::GetDevicesAndDescriptions( vector<InputDeviceInfo>& vDevicesOut )
-{
-	vDevicesOut.push_back( InputDeviceInfo(DEVICE_KEYBOARD, "SextetStream") );
-}
-
-static const DeviceButton g_keys[] =
-{
-	// Some of the default keys for the dance game type
-	KEY_LEFT,		// DANCE_BUTTON_LEFT,
-	KEY_RIGHT,		// DANCE_BUTTON_RIGHT,
-	KEY_UP,			// DANCE_BUTTON_UP,
-	KEY_DOWN,		// DANCE_BUTTON_DOWN,
-	KEY_ENTER,		// DANCE_BUTTON_START,
-	KEY_ENTER,		// DANCE_BUTTON_START,
-	KEY_ENTER,		// DANCE_BUTTON_START,
-	KEY_DEL,		// DANCE_BUTTON_MENULEFT
-	KEY_PGDN,		// DANCE_BUTTON_MENURIGHT
-	KEY_HOME,		// DANCE_BUTTON_MENUUP
-	KEY_END,		// DANCE_BUTTON_MENUDOWN
-	KEY_F1,			// DANCE_BUTTON_COIN
-	KEY_F1,			// DANCE_BUTTON_COIN
-	KEY_KP_C4,		// DANCE_BUTTON_LEFT,
-	KEY_KP_C6,		// DANCE_BUTTON_RIGHT,
-	KEY_KP_C8,		// DANCE_BUTTON_UP,
-	KEY_KP_C2,		// DANCE_BUTTON_DOWN,
-	KEY_KP_C7,		// DANCE_BUTTON_UPLEFT,
-	KEY_KP_C9,		// DANCE_BUTTON_UPRIGHT,
-	KEY_KP_ENTER,		// DANCE_BUTTON_START,
-	KEY_KP_ENTER,		// DANCE_BUTTON_START,
-	KEY_KP_ENTER,		// DANCE_BUTTON_START,
-	KEY_KP_SLASH,		// DANCE_BUTTON_MENULEFT
-	KEY_KP_ASTERISK,	// DANCE_BUTTON_MENURIGHT
-	KEY_KP_HYPHEN,		// DANCE_BUTTON_MENUUP
-	KEY_KP_PLUS,		// DANCE_BUTTON_MENUDOWN
-};
-
-static DeviceButton GetRandomKeyboardKey()
-{
-	int index = RandomInt( ARRAYLEN(g_keys) );
-	return g_keys[index];
-}
-
-
-void InputHandler_SextetStream::Update()
-{
-	if( !PREFSMAN->m_bMonkeyInput )
-	{
-		if( m_dbLast != DeviceButton_Invalid )
-		{
-			// End the previous key
-			DeviceInput di = DeviceInput( DEVICE_KEYBOARD, m_dbLast, 0 );
-			ButtonPressed( di );
-			m_dbLast = DeviceButton_Invalid;
-		}
-		InputHandler::UpdateTimer();
-		return;
+	if(impl(this)) {
+		delete impl(this);
 	}
-	
-	float fSecsAgo = m_timerPressButton.Ago();
+}
 
-	if( fSecsAgo > 0.5 )
+
+// InputHandler_SextetStreamFromFile
+
+REGISTER_INPUT_HANDLER_CLASS(SextetStreamFromFile);
+
+#if defined(_WINDOWS)
+	#define DEFAULT_INPUT_FILENAME "\\\\.\\pipe\\StepMania-Input-SextetStream"
+#else
+	#define DEFAULT_INPUT_FILENAME "Data/StepMania-Input-SextetStream.in"
+#endif
+static Preference<RString> g_sSextetStreamInputFilename("SextetStreamInputFilename", DEFAULT_INPUT_FILENAME);
+
+namespace
+{
+	class RageFileImpl : public Impl
 	{
-		if( m_dbLast != DeviceButton_Invalid )
+	protected:
+		RageFile * file;
+
+	public:
+		RageFileImpl(RageFile * file)
 		{
-			// End the previous key
-			DeviceInput di = DeviceInput( DEVICE_KEYBOARD, m_dbLast, 0 );
-			ButtonPressed( di );
+			this->file = file;
 		}
 
-		// Choose a new key and send it.
-		m_dbLast = GetRandomKeyboardKey();
-		DeviceInput di = DeviceInput( DEVICE_KEYBOARD, m_dbLast, 1 );
-		ButtonPressed( di );
-		m_timerPressButton.Touch();
+		virtual ~RageFileImpl()
+		{
+			if(file != NULL)
+			{
+				file->Close();
+				SAFE_DELETE(file);
+			}
+		}
+
+		virtual bool ReadLine(RString& line)
+		{
+			if(file != NULL)
+			{
+				return (file->GetLine(line) > 0);
+			}
+		}
+	}
+}
+
+inline RageFile * openInputStream(const RString& filename)
+{
+	RageFile * file = new RageFile;
+
+	if(!file->Open(filename, RageFile::READ|RageFile::STREAMED))
+	{
+		LOG->Warn("Error opening file '%s' for output: %s", filename.c_str(), file->GetError().c_str());
+		SAFE_DELETE(file);
+		file = NULL;
 	}
 
-	InputHandler::UpdateTimer();
+	return file;
 }
+
+InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(RageFile * file)
+{
+	_impl = new RageFileImpl(file);
+}
+
+InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(const RString& filename)
+{
+	_impl = new RageFileImpl(openInputStream(filename));
+}
+
+InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile()
+{
+	_impl = new RageFileImpl(openInputStream(g_sSextetStreamInputFilename));
+}
+
+
+
+
 
 /*
- * (c) 2002-2004 Chris Danford
- * All rights reserved.
- * 
+ * Copyright © 2014 Peter S. May
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
  * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, and/or sell copies of the Software, and to permit persons to
- * whom the Software is furnished to do so, provided that the above
- * copyright notice(s) and this permission notice appear in all copies of
- * the Software and that both the above copyright notice(s) and this
- * permission notice appear in supporting documentation.
- * 
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
- * THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS
- * INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT
- * OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
- * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+ * NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+ * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-

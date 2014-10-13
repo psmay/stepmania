@@ -1,48 +1,61 @@
-// This placeholder is just a copy of InputHandler_MonkeyKeyboard with some names changed
 #ifndef INPUT_HANDLER_SEXTETSTREAM
 #define INPUT_HANDLER_SEXTETSTREAM
 
 #include "InputHandler.h"
-#include "RageTimer.h"
-#include "RageInputDevice.h"
+#include "RageFile.h"
 
 class InputHandler_SextetStream: public InputHandler
 {
 public:
-	void Update();
 	InputHandler_SextetStream();
-	~InputHandler_SextetStream();
-	void GetDevicesAndDescriptions( vector<InputDeviceInfo>& vDevicesOut );
+	virtual ~InputHandler_SextetStream();
+	//virtual void Update();
+	virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut);
 
 private:
-	RageTimer m_timerPressButton;
-	DeviceButton m_dbLast;	// Last input that we sent
+	void * _impl;
+};
+
+// Note: InputHandler_SextetStreamFromFile uses a RageFile, which implements
+// blocking I/O. For the handler thread to close in a timely fashion, the
+// producer of data for this file (e.g. the program at the other end of the
+// pipe) must either close the file or output and flush a line of data no
+// less often than about once per second, even if there has been no change.
+// (Repeating the most recent state accomplishes this without triggering any
+// new events.) Either of these interrupts the blocking read so that the
+// loop can check its continue flag.
+class InputHandler_SextetStreamFromFile: public InputHandler_SextetStream
+{
+public:
+	InputHandler_SextetStreamFromFile();
+	InputHandler_SextetStreamFromFile(const RString& filename);
+
+	// The file object passed here should already be open, and will be
+	// closed and deleted in the destructor.
+	InputHandler_SextetStreamFromFile(RageFile * file);
 };
 
 #endif
 
 /*
- * (c) 2002-2004 Glenn Maynard
- * All rights reserved.
- * 
+ * Copyright © 2014 Peter S. May
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
  * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, and/or sell copies of the Software, and to permit persons to
- * whom the Software is furnished to do so, provided that the above
- * copyright notice(s) and this permission notice appear in all copies of
- * the Software and that both the above copyright notice(s) and this
- * permission notice appear in supporting documentation.
- * 
+ * distribute, sublicense, and/or sell copies of the Software, and to permit
+ * persons to whom the Software is furnished to do so, subject to the
+ * following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included
+ * in all copies or substantial portions of the Software.
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
- * THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS
- * INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT
- * OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
- * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
- * OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+ * NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+ * USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-
