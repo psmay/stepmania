@@ -12,8 +12,10 @@ public:
 	//virtual void Update();
 	virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut);
 
+public:
+	class Impl;
 private:
-	void * _impl;
+	Impl * _impl;
 };
 
 // Note: InputHandler_SextetStreamFromFile uses a RageFile, which implements
