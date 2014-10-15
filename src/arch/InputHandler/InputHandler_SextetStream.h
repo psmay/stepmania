@@ -14,7 +14,7 @@ public:
 
 public:
 	class Impl;
-private:
+protected:
 	Impl * _impl;
 };
 

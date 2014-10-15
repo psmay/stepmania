@@ -1,8 +1,9 @@
 #include "global.h"
 #include "InputHandler_SextetStream.h"
-#include "RageUtil.h"
 #include "PrefsManager.h"
+#include "RageLog.h"
 #include "RageThreads.h"
+#include "RageUtil.h"
 
 // In so many words, ceil(n/6).
 #define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
@@ -64,10 +65,10 @@ protected:
 	virtual bool ReadLine(RString& line) = 0;
 
 public:
-	Impl(InputHandler_SextetStream * _this) :
-		continueInputThread(false),
-		timeout_ms(DEFAULT_TIMEOUT_MS)
+	Impl(InputHandler_SextetStream * _this)
 	{
+		continueInputThread = false;
+		timeout_ms = DEFAULT_TIMEOUT_MS;
 		handler = _this;
 		clearStateBuffer();
 		createThread();
@@ -153,7 +154,6 @@ public:
 
 	void RunInputThread()
 	{
-		InputDevice id;
 		RString line;
 
 		while(continueInputThread) {
@@ -170,7 +170,7 @@ public:
 			}
 		}
 	}
-}
+};
 
 void InputHandler_SextetStream::GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
 {
@@ -232,8 +232,9 @@ namespace
 			{
 				return (file->GetLine(line) > 0);
 			}
+			return false;
 		}
-	}
+	};
 }
 
 inline RageFile * openInputStream(const RString& filename)
