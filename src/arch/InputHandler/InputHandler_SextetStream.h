@@ -3,6 +3,7 @@
 
 #include "InputHandler.h"
 #include "RageFile.h"
+#include <cstdio>
 
 class InputHandler_SextetStream: public InputHandler
 {
@@ -18,23 +19,26 @@ private:
 	Impl * _impl;
 };
 
-// Note: InputHandler_SextetStreamFromFile uses a RageFile, which implements
-// blocking I/O. For the handler thread to close in a timely fashion, the
-// producer of data for this file (e.g. the program at the other end of the
-// pipe) must either close the file or output and flush a line of data no
-// less often than about once per second, even if there has been no change.
-// (Repeating the most recent state accomplishes this without triggering any
-// new events.) Either of these interrupts the blocking read so that the
-// loop can check its continue flag.
+// Note: InputHandler_SextetStreamFromFile uses either a RageFile or a C
+// FILE*, either of which implements blocking I/O. For the handler thread to
+// close in a timely fashion, the producer of data for this file (e.g. the
+// program at the other end of the pipe) must either close the file or
+// output and flush a line of data no less often than about once per second,
+// even if there has been no change. (Repeating the most recent state
+// accomplishes this without triggering any new events.) Either of these
+// interrupts the blocking read so that the loop can check its continue
+// flag.
 class InputHandler_SextetStreamFromFile: public InputHandler_SextetStream
 {
 public:
 	InputHandler_SextetStreamFromFile();
 	InputHandler_SextetStreamFromFile(const RString& filename);
 
-	// The file object passed here should already be open, and will be
-	// closed and deleted in the destructor.
+	// The file object passed here must already be open, and if possible,
+	// buffering should be disabled. The file object will be closed (and,
+	// if a RageFile, deleted) in the destructor.
 	InputHandler_SextetStreamFromFile(RageFile * file);
+	InputHandler_SextetStreamFromFile(std::FILE * file);
 };
 
 #endif
