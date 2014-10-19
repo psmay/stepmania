@@ -14,9 +14,19 @@ using namespace std;
 // In so many words, ceil(n/6).
 #define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
 
-#define _DEVICE DEVICE_JOY1
+#define FIRST_DEVICE DEVICE_JOY1
+
+#define FIRST_JOY_BUTTON JOY_BUTTON_1
+#define LAST_JOY_BUTTON JOY_BUTTON_32
+#define COUNT_JOY_BUTTON ((LAST_JOY_BUTTON) - (FIRST_JOY_BUTTON) + 1)
+
+#define FIRST_KEY KEY_OTHER_0
+#define LAST_KEY KEY_LAST_OTHER
+#define COUNT_KEY ((LAST_KEY) - (FIRST_KEY) + 1)
+
+#define BUTTON_COUNT (COUNT_JOY_BUTTON + COUNT_KEY)
+
 #define DEFAULT_TIMEOUT_MS 1000
-#define BUTTON_COUNT 64
 #define STATE_BUFFER_SIZE NUMBER_OF_SEXTETS_FOR_BIT_COUNT(BUTTON_COUNT)
 
 namespace
@@ -117,6 +127,8 @@ class InputHandler_SextetStream::Impl
 	public:
 		Impl(InputHandler_SextetStream * _this)
 		{
+			LOG->Info("Number of button states supported by current InputHandler_SextetStream: %u",
+				(unsigned)BUTTON_COUNT);
 			continueInputThread = false;
 			timeout_ms = DEFAULT_TIMEOUT_MS;
 
@@ -135,7 +147,7 @@ class InputHandler_SextetStream::Impl
 
 		virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
 		{
-			vDevicesOut.push_back(InputDeviceInfo(_DEVICE, "SextetStream"));
+			vDevicesOut.push_back(InputDeviceInfo(FIRST_DEVICE, "SextetStream"));
 		}
 
 		static int StartInputThread(void * p)
@@ -167,14 +179,22 @@ class InputHandler_SextetStream::Impl
 			}
 		}
 
-		inline DeviceButton JoyButtonAtIndex(size_t index)
+		inline DeviceButton ButtonAtIndex(size_t index)
 		{
-			return enum_add2(JOY_BUTTON_1, index);
+			if(index < COUNT_JOY_BUTTON) {
+				return enum_add2(FIRST_JOY_BUTTON, index);
+			}
+			else if(index < COUNT_JOY_BUTTON + COUNT_KEY) {
+				return enum_add2(FIRST_KEY, index - COUNT_JOY_BUTTON);
+			}
+			else {
+				return DeviceButton_Invalid;
+			}
 		}
 
 		inline void ReactToChanges(const uint8_t * newStateBuffer)
 		{
-			InputDevice id = InputDevice(_DEVICE);
+			InputDevice id = InputDevice(FIRST_DEVICE);
 			uint8_t changes[STATE_BUFFER_SIZE];
 			RageTimer now;
 
@@ -191,7 +211,7 @@ class InputHandler_SextetStream::Impl
 						if(changes[m] & (1 << n)) {
 							bool value = newStateBuffer[m] & (1 << n);
 							LOG->Trace("SS button index %zu %s", bi, value ? "pressed" : "released");
-							DeviceInput di = DeviceInput(id, JoyButtonAtIndex(bi), value, now);
+							DeviceInput di = DeviceInput(id, ButtonAtIndex(bi), value, now);
 							ButtonPressed(di);
 						}
 					}
@@ -297,7 +317,7 @@ namespace
 						std::strerror(errno));
 				}
 				else {
-					LOG->Trace("File opened");
+					LOG->Info("File opened");
 					// Disable buffering on the file
 					std::setbuf(file, NULL);
 				}
