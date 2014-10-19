@@ -1,11 +1,14 @@
 #include "global.h"
 #include "InputHandler_SextetStream.h"
-#include "RageUtil.h"
 #include "PrefsManager.h"
+#include "RageLog.h"
 #include "RageThreads.h"
+#include "RageUtil.h"
 
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
+
 using namespace std;
 
 // In so many words, ceil(n/6).
@@ -16,9 +19,9 @@ using namespace std;
 #define BUTTON_COUNT 64
 #define STATE_BUFFER_SIZE NUMBER_OF_SEXTETS_FOR_BIT_COUNT(BUTTON_COUNT)
 
-typedef InputHandler_SextetStream _Base;
-typedef _Base::Impl _BaseImpl;
-typedef InputHandler_SextetStreamFromFile _FromFile;
+#define _Base InputHandler_SextetStream
+#define _BaseImpl _Base::Impl
+#define _FromFile InputHandler_SextetStreamFromFile
 
 namespace
 {
@@ -99,6 +102,7 @@ class _Base::Impl
 
 		inline void createThread()
 		{
+			continueInputThread = true;
 			inputThread.SetName("SextetStream input thread");
 			inputThread.Create(StartInputThread, this);
 		}
@@ -107,7 +111,7 @@ class _Base::Impl
 		{
 			LineReader * linereader = getUnvalidatedLineReader();
 			if(linereader != NULL) {
-				if(!linereader.IsValid()) {
+				if(!linereader->IsValid()) {
 					delete linereader;
 					linereader = NULL;
 				}
@@ -116,9 +120,11 @@ class _Base::Impl
 		}
 
 	public:
-		Impl(_Base * _this) :
-			continueInputThread(false), timeout_ms(DEFAULT_TIMEOUT_MS)
+		Impl(_Base * _this)
 		{
+			continueInputThread = false;
+			timeout_ms = DEFAULT_TIMEOUT_MS;
+
 			handler = _this;
 			clearStateBuffer();
 			createThread();
@@ -189,6 +195,7 @@ class _Base::Impl
 					if(bi < BUTTON_COUNT) {
 						if(changes[m] & (1 << n)) {
 							bool value = newStateBuffer[m] & (1 << n);
+							LOG->Trace("SS button index %zu %s", bi, value ? "pressed" : "released");
 							DeviceInput di = DeviceInput(id, JoyButtonAtIndex(bi), value, now);
 							ButtonPressed(di);
 						}
@@ -202,18 +209,21 @@ class _Base::Impl
 
 		void RunInputThread()
 		{
-			InputDevice id;
 			RString line;
 			LineReader * linereader;
 
+			LOG->Trace("Input thread started; getting line reader");
 			linereader = getLineReader();
 
 			if(linereader == NULL) {
 				LOG->Warn("Could not open line reader for SextetStream input");
 			}
 			else {
+				LOG->Trace("Got line reader");
 				while(continueInputThread) {
+					LOG->Trace("Reading line");
 					if(linereader->ReadLine(line)) {
+						LOG->Trace("Got line: '%s'", line.c_str());
 						if(line.length() > 0) {
 							uint8_t newStateBuffer[STATE_BUFFER_SIZE];
 							GetNewState(newStateBuffer, line);
@@ -222,13 +232,15 @@ class _Base::Impl
 					}
 					else {
 						// Error or EOF condition.
+						LOG->Trace("Reached end of SextetStream input");
 						continueInputThread = false;
 					}
 				}
+				LOG->Info("SextetStream input stopped");
 				delete linereader;
 			}
 		}
-}
+};
 
 void _Base::GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
 {
@@ -270,11 +282,14 @@ namespace
 		public:
 			RageFileLineReader(RageFile * rageFile)
 			{
+				LOG->Info("Starting InputHandler_SextetStreamFromFile from open RageFile");
 				file = rageFile;
 			}
 
 			RageFileLineReader(const RString& filename)
 			{
+				LOG->Info("Starting InputHandler_SextetStreamFromFile from RageFile with filename '%s'",
+					filename.c_str());
 				file = new RageFile;
 
 				if(!file->Open(filename, RageFile::READ)) {
@@ -282,6 +297,9 @@ namespace
 						file->GetError().c_str());
 					SAFE_DELETE(file);
 					file = NULL;
+				}
+				else {
+					LOG->Trace("File opened");
 				}
 			}
 
@@ -309,7 +327,7 @@ namespace
 		private:
 			// The buffer size isn't critical; the RString will simply be
 			// extended until the line is done.
-			const size_t BUFFER_SIZE = 64;
+			static const size_t BUFFER_SIZE = 64;
 			char buffer[BUFFER_SIZE];
 		protected:
 			std::FILE * file;
@@ -317,18 +335,22 @@ namespace
 		public:
 			StdCFileLineReader(std::FILE * file)
 			{
+				LOG->Info("Starting InputHandler_SextetStreamFromFile from open std::FILE");
 				this->file = file;
 			}
 
 			StdCFileLineReader(const RString& filename)
 			{
+				LOG->Info("Starting InputHandler_SextetStreamFromFile from std::FILE with filename '%s'",
+					filename.c_str());
 				file = std::fopen(filename.c_str(), "rb");
 
 				if(file == NULL) {
 					LOG->Warn("Error opening file '%s' for input (cstdio): %s", filename.c_str(),
-						file->GetError().c_str());
+						std::strerror(errno));
 				}
 				else {
+					LOG->Trace("File opened");
 					// Disable buffering on the file
 					std::setbuf(file, NULL);
 				}
