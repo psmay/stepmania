@@ -19,10 +19,6 @@ using namespace std;
 #define BUTTON_COUNT 64
 #define STATE_BUFFER_SIZE NUMBER_OF_SEXTETS_FOR_BIT_COUNT(BUTTON_COUNT)
 
-#define _Base InputHandler_SextetStream
-#define _BaseImpl _Base::Impl
-#define _FromFile InputHandler_SextetStreamFromFile
-
 namespace
 {
 	class LineReader
@@ -72,10 +68,10 @@ namespace
 	};
 }
 
-class _Base::Impl
+class InputHandler_SextetStream::Impl
 {
 	private:
-		_Base * handler;
+		InputHandler_SextetStream * handler;
 
 	protected:
 		void ButtonPressed(const DeviceInput& di)
@@ -83,7 +79,6 @@ class _Base::Impl
 			handler->ButtonPressed(di);
 		}
 
-	protected:
 		uint8_t stateBuffer[STATE_BUFFER_SIZE];
 		size_t timeout_ms;
 		RageThread inputThread;
@@ -120,7 +115,7 @@ class _Base::Impl
 		}
 
 	public:
-		Impl(_Base * _this)
+		Impl(InputHandler_SextetStream * _this)
 		{
 			continueInputThread = false;
 			timeout_ms = DEFAULT_TIMEOUT_MS;
@@ -242,19 +237,19 @@ class _Base::Impl
 		}
 };
 
-void _Base::GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
+void InputHandler_SextetStream::GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
 {
 	if(_impl != NULL) {
 		_impl->GetDevicesAndDescriptions(vDevicesOut);
 	}
 }
 
-_Base::_Base()
+InputHandler_SextetStream::InputHandler_SextetStream()
 {
 	_impl = NULL;
 }
 
-_Base::~_Base()
+InputHandler_SextetStream::~InputHandler_SextetStream()
 {
 	if(_impl != NULL) {
 		delete _impl;
@@ -266,62 +261,14 @@ _Base::~_Base()
 REGISTER_INPUT_HANDLER_CLASS (SextetStreamFromFile);
 
 #if defined(_WINDOWS)
-#define DEFAULT_INPUT_FILENAME "\\\\.\\pipe\\StepMania-Input-SextetStream"
+	#define DEFAULT_INPUT_FILENAME "\\\\.\\pipe\\StepMania-Input-SextetStream"
 #else
-#define DEFAULT_INPUT_FILENAME "Data/StepMania-Input-SextetStream.in"
+	#define DEFAULT_INPUT_FILENAME "Data/StepMania-Input-SextetStream.in"
 #endif
 static Preference<RString> g_sSextetStreamInputFilename("SextetStreamInputFilename", DEFAULT_INPUT_FILENAME);
 
 namespace
 {
-	class RageFileLineReader: public LineReader
-	{
-		protected:
-			RageFile * file;
-
-		public:
-			RageFileLineReader(RageFile * rageFile)
-			{
-				LOG->Info("Starting InputHandler_SextetStreamFromFile from open RageFile");
-				file = rageFile;
-			}
-
-			RageFileLineReader(const RString& filename)
-			{
-				LOG->Info("Starting InputHandler_SextetStreamFromFile from RageFile with filename '%s'",
-					filename.c_str());
-				file = new RageFile;
-
-				if(!file->Open(filename, RageFile::READ)) {
-					LOG->Warn("Error opening file '%s' for input (RageFile): %s", filename.c_str(),
-						file->GetError().c_str());
-					SAFE_DELETE(file);
-					file = NULL;
-				}
-				else {
-					LOG->Trace("File opened");
-				}
-			}
-
-			~RageFileLineReader()
-			{
-				if(file != NULL) {
-					file->Close();
-					SAFE_DELETE(file);
-				}
-			}
-
-			virtual bool IsValid()
-			{
-				return file != NULL;
-			}
-
-			virtual bool ReadLine(RString& line)
-			{
-				return (file == NULL) ? false : (file->GetLine(line) > 0);
-			}
-	};
-
 	class StdCFileLineReader: public LineReader
 	{
 		private:
@@ -390,60 +337,14 @@ namespace
 			}
 	};
 
-	class RageFileHandleImpl: public _BaseImpl
-	{
-		protected:
-			RageFile * file;
-
-		public:
-			RageFileHandleImpl(_FromFile * handler, RageFile * file) :
-				_BaseImpl(handler)
-			{
-				this->file = file;
-			}
-
-			virtual LineReader * getUnvalidatedLineReader()
-			{
-				return new RageFileLineReader(this->file);
-			}
-
-			virtual ~RageFileHandleImpl()
-			{
-				// line reader dtor will destroy file for us
-			}
-	};
-
-	class RageFileNameImpl: public _BaseImpl
-	{
-		protected:
-			RString filename;
-
-		public:
-			RageFileNameImpl(_FromFile * handler, const RString& filename) :
-				_BaseImpl(handler)
-			{
-				this->filename = filename;
-			}
-
-			virtual LineReader * getUnvalidatedLineReader()
-			{
-				return new RageFileLineReader(filename);
-			}
-
-			virtual ~RageFileNameImpl()
-			{
-				// Nothing to destroy
-			}
-	};
-
-	class StdCFileHandleImpl: public _BaseImpl
+	class StdCFileHandleImpl: public InputHandler_SextetStream::Impl
 	{
 		protected:
 			std::FILE * file;
 
 		public:
-			StdCFileHandleImpl(_FromFile * handler, std::FILE * file) :
-				_BaseImpl(handler)
+			StdCFileHandleImpl(InputHandler_SextetStreamFromFile * handler, std::FILE * file) :
+				InputHandler_SextetStream::Impl(handler)
 			{
 				this->file = file;
 			}
@@ -459,14 +360,14 @@ namespace
 			}
 	};
 
-	class StdCFileNameImpl: public _BaseImpl
+	class StdCFileNameImpl: public InputHandler_SextetStream::Impl
 	{
 		protected:
 			RString filename;
 
 		public:
-			StdCFileNameImpl(_FromFile * handler, const RString& filename) :
-				_BaseImpl(handler)
+			StdCFileNameImpl(InputHandler_SextetStreamFromFile * handler, const RString& filename) :
+				InputHandler_SextetStream::Impl(handler)
 			{
 				this->filename = filename;
 			}
@@ -483,30 +384,20 @@ namespace
 	};
 }
 
-#ifdef INPUT_HANDLER_SEXTET_STREAM_USE_RAGEFILE_DEFAULT
-#define DefaultFileNameImpl RageFileNameImpl
-#else
-#define DefaultFileNameImpl StdCFileNameImpl
-#endif
 
-_FromFile::_FromFile(RageFile * file)
-{
-	_impl = new RageFileHandleImpl(this, file);
-}
-
-_FromFile::_FromFile(FILE * file)
+InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(FILE * file)
 {
 	_impl = new StdCFileHandleImpl(this, file);
 }
 
-_FromFile::_FromFile(const RString& filename)
+InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(const RString& filename)
 {
-	_impl = new DefaultFileNameImpl(this, filename);
+	_impl = new StdCFileNameImpl(this, filename);
 }
 
-_FromFile::_FromFile()
+InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile()
 {
-	_impl = new DefaultFileNameImpl(this, g_sSextetStreamInputFilename);
+	_impl = new StdCFileNameImpl(this, g_sSextetStreamInputFilename);
 }
 
 /*
