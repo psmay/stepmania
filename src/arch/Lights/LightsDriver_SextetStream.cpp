@@ -89,20 +89,25 @@ namespace
 	{
 	protected:
 		EzSockets * out;
+
 	public:
 		EzSocketsLineWriter(EzSockets * sock) {
 			out = sock;
 		}
+
 		virtual ~EzSocketsLineWriter() {
 			Close();
 		}
+
 		virtual bool IsOpen() {
 			return ((out != NULL) && (out->state != EzSockets::skDISCONNECTED));
 		}
+
 		virtual void WriteLine(const RString& line) {
 			out->SendData(line);
 			out->SendData("\x0D\x0A");
 		}
+
 		virtual void Close() {
 			if(IsOpen()) {
 				out->close();
