@@ -4,6 +4,10 @@
 #include "RageLog.h"
 #include "RageUtil.h"
 
+#if !defined(WITHOUT_NETWORKING)
+#include "ezsockets.h"
+#endif
+
 #include <cstring>
 
 using namespace std;
@@ -78,7 +82,37 @@ namespace
 			}
 		}
 	};
-			
+
+#if !defined(WITHOUT_NETWORKING)
+	// LineWriter for EzSockets
+	class EzSocketsLineWriter : public LineWriter
+	{
+	protected:
+		EzSockets * out;
+	public:
+		EzSocketsLineWriter(EzSockets * sock) {
+			out = sock;
+		}
+		virtual ~EzSocketsLineWriter() {
+			Close();
+		}
+		virtual bool IsOpen() {
+			return ((out != NULL) && (out->state != EzSockets::skDISCONNECTED));
+		}
+		virtual void WriteLine(const RString& line) {
+			out->SendData(line);
+			out->SendData("\x0D\x0A");
+		}
+		virtual void Close() {
+			if(IsOpen()) {
+				out->close();
+			}
+			if(out != NULL) {
+				delete out;
+			}
+		}
+	};
+#endif // !defined(WITHOUT_NETWORKING)
 }
 
 
@@ -328,6 +362,52 @@ LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
 {
 	_impl = new Impl(openOutputStream(g_sSextetStreamOutputFilename));
 }
+
+#if !defined(WITHOUT_NETWORKING)
+// LightsDriver_SextetStreamToSocket implementation
+
+REGISTER_SOUND_DRIVER_CLASS(SextetStreamToSocket);
+
+#define DEFAULT_HOST "localhost"
+#define DEFAULT_PORT 5734
+
+static Preference<RString> g_sSextetStreamOutputSocketHost("SextetStreamOutputSocketHost", DEFAULT_HOST);
+static Preference<int> g_sSextetStreamOutputSocketPort("SextetStreamOutputSocketPort", DEFAULT_PORT);
+
+inline LineWriter * openOutputSocket(const RString& host, unsigned short port)
+{
+	EzSockets * sock = new EzSockets;
+
+	sock->close();
+	sock->create();
+	sock->blocking = true;
+
+	if(!sock->connect(host, port)) {
+		LOG->Warn("Could not connect to host '%s' port %u for output", host.c_str(), (unsigned int)port);
+		delete sock;
+		sock = NULL;
+	}
+
+	return new EzSocketsLineWriter(sock);
+}
+
+LightsDriver_SextetStreamToSocket::LightsDriver_SextetStreamToSocket(EzSockets * sock)
+{
+	_impl = new Impl(new EzSocketsLineWriter(sock));
+}
+
+LightsDriver_SextetStreamToSocket::LightsDriver_SextetStreamToSocket(const RString& host, unsigned short port)
+{
+	_impl = new Impl(openOutputSocket(host, port));
+}
+
+LightsDriver_SextetStreamToSocket::LightsDriver_SextetStreamToSocket()
+{
+	RString host = g_sSextetStreamOutputSocketHost;
+	int port = g_sSextetStreamOutputSocketPort;
+	_impl = new Impl(openOutputSocket(host, (unsigned short)port));
+}
+#endif // !defined(WITHOUT_NETWORKING)
 
 /*
  * Copyright © 2014-2015 Peter S. May

@@ -17,6 +17,10 @@
 #include "LightsDriver.h"
 #include "RageFile.h"
 
+#if !defined(WITHOUT_NETWORKING)
+#include "ezsockets.h"
+#endif
+
 class LightsDriver_SextetStream : public LightsDriver
 {
 public:
@@ -37,6 +41,19 @@ public:
 	// flushed, closed, and deleted in the destructor.
 	LightsDriver_SextetStreamToFile(RageFile * file);
 };
+
+#if !defined(WITHOUT_NETWORKING)
+class LightsDriver_SextetStreamToSocket : public LightsDriver_SextetStream
+{
+public:
+	LightsDriver_SextetStreamToSocket();
+	LightsDriver_SextetStreamToSocket(const RString& host, unsigned short port);
+
+	// The socket object passed here should already be open, and will be
+	// flushed, closed, and deleted in the destructor.
+	LightsDriver_SextetStreamToSocket(EzSockets * sock);
+};
+#endif // !defined(WITHOUT_NETWORKING)
 
 #endif
 
