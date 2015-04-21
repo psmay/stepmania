@@ -12,8 +12,74 @@ using namespace std;
 static const size_t CABINET_SEXTET_COUNT = 1;
 static const size_t CONTROLLER_SEXTET_COUNT = 6;
 
-// Number of bytes to contain the full pack and a trailing LF
-static const size_t FULL_SEXTET_COUNT = CABINET_SEXTET_COUNT + (NUM_GameController * CONTROLLER_SEXTET_COUNT) + 1;
+// Number of bytes to contain the full pack
+static const size_t FULL_SEXTET_COUNT = CABINET_SEXTET_COUNT + (NUM_GameController * CONTROLLER_SEXTET_COUNT);
+
+// A funny way of saying "char"
+typedef RString::value_type Sextet;
+
+namespace
+{
+	// Abstract interface for line output
+	class LineWriter
+	{
+	public:
+		LineWriter() {}
+		virtual ~LineWriter() {}
+
+		// Returns true if the stream is open. If this method returns
+		// false, the caller may assume that the stream is permanently
+		// closed.
+		virtual bool IsOpen() = 0;
+
+		// Writes the line and a newline to output, and immediately flushes
+		// (if applicable). If the stream is not open, this is a no-op.
+		virtual void WriteLine(const RString& line) = 0;
+
+		// If the underlying stream is closeable, flush and close the
+		// stream. Calling this on a stream that is not open must be
+		// harmless.
+		virtual void Close() {}
+	};
+
+	// LineWriter for RageFile
+	class RageFileLineWriter : public LineWriter
+	{
+	protected:
+		RageFile * out;
+
+	public:
+		RageFileLineWriter(RageFile * file) {
+			out = file;
+		}
+
+		virtual ~RageFileLineWriter() {
+			Close();
+		}
+
+		virtual bool IsOpen() {
+			return ((out != NULL) && out->IsOpen());
+		}
+
+		virtual void WriteLine(const RString& line) {
+			if(IsOpen()) {
+				RString lineNewl = line + "\n";
+				out->Write(lineNewl);
+			}
+		}
+
+		virtual void Close() {
+			if(out != NULL) {
+				if(out->IsOpen()) {
+					out->Flush();
+					out->Close();
+				}
+				out = NULL;
+			}
+		}
+	};
+			
+}
 
 
 // Serialization routines
@@ -21,7 +87,7 @@ static const size_t FULL_SEXTET_COUNT = CABINET_SEXTET_COUNT + (NUM_GameControll
 // Encodes the low 6 bits of a byte as a printable, non-space ASCII
 // character (i.e., within the range 0x21-0x7E) such that the low 6 bits of
 // the character are the same as the input.
-inline uint8_t printableSextet(uint8_t data)
+inline Sextet printableSextet(uint8_t data)
 {
 	// Maps the 6-bit value into the range 0x30-0x6F, wrapped in such a way
 	// that the low 6 bits of the result are the same as the data (so
@@ -40,7 +106,7 @@ inline uint8_t printableSextet(uint8_t data)
 }
 
 // Packs 6 booleans into a 6-bit value
-inline uint8_t packPlainSextet(bool b0, bool b1, bool b2, bool b3, bool b4, bool b5)
+inline uint8_t packSixBitByte(bool b0, bool b1, bool b2, bool b3, bool b4, bool b5)
 {
 	return (uint8_t)(
 		(b0 ? 0x01 : 0) |
@@ -52,30 +118,36 @@ inline uint8_t packPlainSextet(bool b0, bool b1, bool b2, bool b3, bool b4, bool
 }
 
 // Packs 6 booleans into a printable sextet
-inline uint8_t packPrintableSextet(bool b0, bool b1, bool b2, bool b3, bool b4, bool b5)
+inline Sextet packPrintableSextet(bool b0, bool b1, bool b2, bool b3, bool b4, bool b5)
 {
-	return printableSextet(packPlainSextet(b0, b1, b2, b3, b4, b5));
+	return printableSextet(packSixBitByte(b0, b1, b2, b3, b4, b5));
 }
 
-// Packs the cabinet lights into a printable sextet and adds it to a buffer
-inline size_t packCabinetLights(const LightsState *ls, uint8_t* buffer)
+// Packs the cabinet lights into a printable sextet
+inline RString packCabinetLights(const LightsState *ls)
 {
-	buffer[0] = packPrintableSextet(
+	RString buffer;
+	buffer.reserve(CABINET_SEXTET_COUNT);
+
+	buffer += packPrintableSextet(
 		ls->m_bCabinetLights[LIGHT_MARQUEE_UP_LEFT],
 		ls->m_bCabinetLights[LIGHT_MARQUEE_UP_RIGHT],
 		ls->m_bCabinetLights[LIGHT_MARQUEE_LR_LEFT],
 		ls->m_bCabinetLights[LIGHT_MARQUEE_LR_RIGHT],
 		ls->m_bCabinetLights[LIGHT_BASS_LEFT],
 		ls->m_bCabinetLights[LIGHT_BASS_RIGHT]);
-	return CABINET_SEXTET_COUNT;
+
+	return buffer;
 }
 
-// Packs the button lights for a controller into 6 printable sextets and
-// adds them to a buffer
-inline size_t packControllerLights(const LightsState *ls, GameController gc, uint8_t* buffer)
+// Packs the button lights for a controller into 6 printable sextets
+inline RString packControllerLights(const LightsState *ls, GameController gc)
 {
+	RString buffer;
+	buffer.reserve(CONTROLLER_SEXTET_COUNT);
+
 	// Menu buttons
-	buffer[0] = packPrintableSextet(
+	buffer += packPrintableSextet(
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_MENULEFT],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_MENURIGHT],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_MENUUP],
@@ -84,7 +156,7 @@ inline size_t packControllerLights(const LightsState *ls, GameController gc, uin
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_SELECT]);
 
 	// Other non-sensors
-	buffer[1] = packPrintableSextet(
+	buffer += packPrintableSextet(
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_BACK],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_COIN],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_OPERATOR],
@@ -93,28 +165,28 @@ inline size_t packControllerLights(const LightsState *ls, GameController gc, uin
 		false);
 
 	// Sensors
-	buffer[2] = packPrintableSextet(
+	buffer += packPrintableSextet(
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_01],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_02],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_03],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_04],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_05],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_06]);
-	buffer[3] = packPrintableSextet(
+	buffer += packPrintableSextet(
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_07],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_08],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_09],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_10],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_11],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_12]);
-	buffer[4] = packPrintableSextet(
+	buffer += packPrintableSextet(
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_13],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_14],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_15],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_16],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_17],
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_18]);
-	buffer[5] = packPrintableSextet(
+	buffer += packPrintableSextet(
 		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_19],
 		false,
 		false,
@@ -122,24 +194,22 @@ inline size_t packControllerLights(const LightsState *ls, GameController gc, uin
 		false,
 		false);
 
-	return CONTROLLER_SEXTET_COUNT;
+	return buffer;
 }
 
-inline size_t packLine(uint8_t * buffer, const LightsState* ls)
+inline RString packFullMessage(const LightsState* ls)
 {
-	size_t index = 0;
+	RString message;
+	message.reserve(FULL_SEXTET_COUNT);
 
-	index += packCabinetLights(ls, &(buffer[index]));
+	message += packCabinetLights(ls);
 
 	FOREACH_ENUM(GameController, gc)
 	{
-		index += packControllerLights(ls, gc, &(buffer[index]));
+		message += packControllerLights(ls, gc);
 	}
 
-	// Terminate with LF
-	buffer[index++] = 0xA;
-
-	return index;
+	return message;
 }
 
 
@@ -155,43 +225,37 @@ namespace
 	class Impl
 	{
 	protected:
-		uint8_t lastOutput[FULL_SEXTET_COUNT];
-		RageFile * out;
+		RString lastOutput;
+		LineWriter * lw;
 
 	public:
-		Impl(RageFile * file) {
-			out = file;
-
-			// Ensure a non-match the first time
-			lastOutput[0] = 0;
+		Impl(LineWriter * lineWriter) {
+			lw = lineWriter;
+			lastOutput.clear();
+			lastOutput.reserve(FULL_SEXTET_COUNT);
 		}
 
 		virtual ~Impl() {
-			if(out != NULL)
-			{
-				out->Flush();
-				out->Close();
-				SAFE_DELETE(out);
+			if(lw != NULL) {
+				delete lw;
+				lw = NULL;
 			}
 		}
 
 		void Set(const LightsState * ls)
 		{
-			uint8_t buffer[FULL_SEXTET_COUNT];
-
-			packLine(buffer, ls);
+			RString message = packFullMessage(ls);
 
 			// Only write if the message has changed since the last write.
-			if(memcmp(buffer, lastOutput, FULL_SEXTET_COUNT) != 0)
+			if(message != lastOutput)
 			{
-				if(out != NULL)
+				if((lw != NULL) && lw->IsOpen())
 				{
-					out->Write(buffer, FULL_SEXTET_COUNT);
-					out->Flush();
+					lw->WriteLine(message);
 				}
 
 				// Remember last message
-				memcpy(lastOutput, buffer, FULL_SEXTET_COUNT);
+				lastOutput = message;
 			}
 		}
 	};
@@ -236,7 +300,7 @@ REGISTER_SOUND_DRIVER_CLASS(SextetStreamToFile);
 #endif
 static Preference<RString> g_sSextetStreamOutputFilename("SextetStreamOutputFilename", DEFAULT_OUTPUT_FILENAME);
 
-inline RageFile * openOutputStream(const RString& filename)
+inline LineWriter * openOutputStream(const RString& filename)
 {
 	RageFile * file = new RageFile;
 
@@ -247,12 +311,12 @@ inline RageFile * openOutputStream(const RString& filename)
 		file = NULL;
 	}
 
-	return file;
+	return new RageFileLineWriter(file);
 }
 
 LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(RageFile * file)
 {
-	_impl = new Impl(file);
+	_impl = new Impl(new RageFileLineWriter(file));
 }
 
 LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(const RString& filename)
@@ -266,7 +330,7 @@ LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
 }
 
 /*
- * Copyright © 2014 Peter S. May
+ * Copyright © 2014-2015 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
