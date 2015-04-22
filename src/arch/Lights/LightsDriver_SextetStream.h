@@ -58,7 +58,7 @@ public:
 #endif
 
 /*
- * Copyright © 2014 Peter S. May
+ * Copyright © 2014-2015 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
