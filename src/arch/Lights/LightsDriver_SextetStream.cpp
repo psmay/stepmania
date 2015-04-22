@@ -114,6 +114,7 @@ namespace
 			}
 			if(out != NULL) {
 				delete out;
+				out = NULL;
 			}
 		}
 	};
