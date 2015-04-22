@@ -4,11 +4,9 @@
 #include "InputHandler.h"
 #include <cstdio>
 
-#if 0 // implementation pending
 #if !defined(WITHOUT_NETWORKING)
 #include "ezsockets.h"
 #endif // !defined(WITHOUT_NETWORKING)
-#endif // 0
 
 class InputHandler_SextetStream: public InputHandler
 {
@@ -50,13 +48,12 @@ public:
 	InputHandler_SextetStreamFromFile(std::FILE * file);
 };
 
-#if 0 // implementation pending
 #if !defined(WITHOUT_NETWORKING)
 class InputHandler_SextetStreamFromSocket: public InputHandler_SextetStream
 {
 public:
 	InputHandler_SextetStreamFromSocket();
-	InputHandler_SextetStreamFromSocket(const RString& filename);
+	InputHandler_SextetStreamFromSocket(const RString& host, unsigned short port);
 
 	// The socket object passed here must already be open and buffering, if
 	// applicable, should be disabled. The socket object will be closed and
@@ -64,7 +61,6 @@ public:
 	InputHandler_SextetStreamFromSocket(EzSockets * sock);
 };
 #endif // !defined(WITHOUT_NETWORKING)
-#endif // 0
 
 #endif
 

@@ -118,7 +118,7 @@ namespace
 	};
 
 
-	class StdCFileLineReader: public LineReader
+	class StdCFileLineReader : public LineReader
 	{
 		private:
 			// The buffer size isn't critical; the RString will simply be
@@ -215,6 +215,45 @@ namespace
 				return atLeastOneSuccessfulRead;
 			}
 	};
+
+#if !defined(WITHOUT_NETWORKING)
+	class EzSocketsLineReader : public LineReader
+	{
+		private:
+			RString pending;
+
+		protected:
+			EzSockets * sock;
+
+		public:
+			EzSocketsLineReader(EzSockets * sock) {
+				this->sock = sock;
+				pending = "";
+			}
+
+			~EzSocketsLineReader() {
+				Close();
+			}
+
+			virtual bool IsOpen() {
+				return ((sock != NULL) && (sock->state != EzSockets::skDISCONNECTED));
+			}
+
+			virtual bool ReadLine(RString& line) {
+				//XXX
+			}
+
+			virtual void Close() {
+				if(IsOpen()) {
+					sock->close();
+				}
+				if(sock != NULL) {
+					delete sock;
+					sock = NULL;
+				}
+			}
+	}
+#endif // !defined(WITHOUT_NETWORKING)
 }
 
 namespace
@@ -482,6 +521,55 @@ InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile()
 {
 	_impl = new Impl(this, StdCFileLineReader::Open(g_sSextetStreamInputFilename));
 }
+
+
+#if !defined(WITHOUT_NETWORKING)
+// SextetStreamFromSocket
+
+#define DEFAULT_HOST "localhost"
+#define DEFAULT_PORT 5733
+
+static Preference<RString> g_sSextetStreamInputSocketHost("SextetStreamInputSocketHost", DEFAULT_HOST);
+static Preference<int> g_sSextetStreamInputSocketPort("SextetStreamInputSocketPort", DEFAULT_PORT);
+
+inline LineReader * openInputSocket(const RString& host, unsigned short port)
+{
+	EzSockets * sock = new EzSockets;
+
+	sock->close();
+	sock->create();
+	sock->blocking = true;
+
+	if(!sock->connect(host, port)) {
+		LOG->Warn("Could not connect to host '%s' port %u for input", host.c_str(), (unsigned int)port);
+		delete sock;
+		sock = NULL;
+	}
+
+	return new EzSocketsLineReader(sock);
+}
+
+InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket(EzSockets * sock)
+{
+	_impl = new Impl(this, new EzSocketsLineReader(sock));
+}
+
+InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket(const RString& host, unsigned short port)
+{
+	_impl = new Impl(this, openInputSocket(host, port));
+}
+
+InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket()
+{
+	RString host = g_sSextetStreamInputSocketHost;
+	int port = g_sSextetStreamInputSocketPort;
+	_impl = new Impl(this, openInputSocket(host, (unsigned short)port));
+}
+
+#endif // !defined(WITHOUT_NETWORKING)
+
+
+
 
 /*
  * Copyright © 2014-2015 Peter S. May
