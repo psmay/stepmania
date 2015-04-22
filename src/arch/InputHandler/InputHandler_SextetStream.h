@@ -4,6 +4,12 @@
 #include "InputHandler.h"
 #include <cstdio>
 
+#if 0 // implementation pending
+#if !defined(WITHOUT_NETWORKING)
+#include "ezsockets.h"
+#endif // !defined(WITHOUT_NETWORKING)
+#endif // 0
+
 class InputHandler_SextetStream: public InputHandler
 {
 public:
@@ -12,10 +18,11 @@ public:
 	//virtual void Update();
 	virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut);
 
-public:
-	class Impl;
+	// Pretend this is private
+	void _impl_ext(void *);
+
 protected:
-	Impl * _impl;
+	void * _impl;
 };
 
 // Note: InputHandler_SextetStreamFromFile uses blocking I/O. For the
@@ -41,8 +48,23 @@ public:
 	// The file object passed here must already be open and buffering should
 	// be disabled. The file object will be closed in the destructor.
 	InputHandler_SextetStreamFromFile(std::FILE * file);
-
 };
+
+#if 0 // implementation pending
+#if !defined(WITHOUT_NETWORKING)
+class InputHandler_SextetStreamFromSocket: public InputHandler_SextetStream
+{
+public:
+	InputHandler_SextetStreamFromSocket();
+	InputHandler_SextetStreamFromSocket(const RString& filename);
+
+	// The socket object passed here must already be open and buffering, if
+	// applicable, should be disabled. The socket object will be closed and
+	// deleted in the destructor.
+	InputHandler_SextetStreamFromSocket(EzSockets * sock);
+};
+#endif // !defined(WITHOUT_NETWORKING)
+#endif // 0
 
 #endif
 
