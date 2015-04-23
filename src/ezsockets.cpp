@@ -33,6 +33,14 @@
 #define INVALID_SOCKET -1
 #endif
 
+inline timeval usecToTimeval(uint64_t usec)
+{
+	timeval tv;
+	tv.tv_sec = (int)(usec / 1000000);
+	tv.tv_usec = (int)(usec % 1000000);
+	return tv;
+}
+
 EzSockets::EzSockets()
 {
 	MAXCON = 5;
@@ -193,6 +201,16 @@ bool EzSockets::CanRead()
 	return select(sock+1,scks,NULL,NULL,times) > 0;
 }
 
+bool EzSockets::CanRead(uint64_t timeoutUsec)
+{
+	timeval timeout = usecToTimeval(timeoutUsec);
+
+	FD_ZERO(scks);
+	FD_SET((unsigned)sock, scks);
+
+	return select(sock+1,scks,NULL,NULL,&timeout) > 0;
+}
+
 bool EzSockets::IsError()
 {
 	if (state == skERROR)
@@ -214,6 +232,16 @@ bool EzSockets::CanWrite()
 	FD_SET((unsigned)sock, scks);
 
 	return select(sock+1, NULL, scks, NULL, times) > 0;
+}
+
+bool EzSockets::CanWrite(uint64_t timeoutUsec)
+{
+	timeval timeout = usecToTimeval(timeoutUsec);
+
+	FD_ZERO(scks);
+	FD_SET((unsigned)sock, scks);
+
+	return select(sock+1, NULL, scks, NULL, &timeout) > 0;
 }
 
 void EzSockets::update()

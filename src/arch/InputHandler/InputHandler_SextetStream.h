@@ -55,9 +55,9 @@ public:
 	InputHandler_SextetStreamFromSocket();
 	InputHandler_SextetStreamFromSocket(const RString& host, unsigned short port);
 
-	// The socket object passed here must already be open and buffering, if
-	// applicable, should be disabled. The socket object will be closed and
-	// deleted in the destructor.
+	// The socket object passed here must already be open, with blocking set
+	// to false. The socket object will be closed and deleted in the
+	// destructor.
 	InputHandler_SextetStreamFromSocket(EzSockets * sock);
 };
 #endif // !defined(WITHOUT_NETWORKING)

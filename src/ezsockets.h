@@ -64,6 +64,15 @@ public:
 	bool IsError();
 	bool CanWrite();
 
+	// Block with timeout until can read or write, respectively.
+	// Returns true if the availability event was detected. (This does not
+	// necessarily guarantee actual availability, but does indicate a good
+	// time to check for it.)
+	// Returns false if the timeout expired, or if an interrupt or error
+	// occurred.
+	bool CanRead(uint64_t timeoutUsec);
+	bool CanWrite(uint64_t timeoutUsec);
+
 	void update();
 
 	//Raw data system 

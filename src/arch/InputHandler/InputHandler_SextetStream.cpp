@@ -27,6 +27,7 @@ using namespace std;
 #define BUTTON_COUNT (COUNT_JOY_BUTTON + COUNT_KEY)
 
 #define DEFAULT_TIMEOUT_MS 1000
+
 #define STATE_BUFFER_SIZE NUMBER_OF_SEXTETS_FOR_BIT_COUNT(BUTTON_COUNT)
 
 typedef RString::value_type Sextet;
@@ -240,7 +241,11 @@ namespace
 			}
 
 			virtual bool ReadLine(RString& line) {
-				//XXX
+				char buffer[64];
+				XXX
+				USE CanRead(usec timeout) to block interruptibly for read
+				return atLeastOneSuccessfulRead;
+
 			}
 
 			virtual void Close() {
@@ -538,7 +543,7 @@ inline LineReader * openInputSocket(const RString& host, unsigned short port)
 
 	sock->close();
 	sock->create();
-	sock->blocking = true;
+	sock->blocking = false;
 
 	if(!sock->connect(host, port)) {
 		LOG->Warn("Could not connect to host '%s' port %u for input", host.c_str(), (unsigned int)port);
