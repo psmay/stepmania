@@ -9,6 +9,8 @@
 #include <cstdio>
 #include <cstring>
 
+#include <queue>
+
 using namespace std;
 
 // In so many words, ceil(n/6).
@@ -31,6 +33,7 @@ using namespace std;
 #define STATE_BUFFER_SIZE NUMBER_OF_SEXTETS_FOR_BIT_COUNT(BUTTON_COUNT)
 
 typedef RString::value_type Sextet;
+typedef RString::value_type RChar;
 
 
 inline bool isValidSextet(Sextet s)
@@ -90,38 +93,218 @@ inline RString mutexName(const RString& name, const void * p)
 
 namespace
 {
-	class LineReader
+	// Converts arbitrary char input into lines.
+	// Not (meant to be) thread-safe; synchronize accesses as needed.
+	class LineBuffer
 	{
-	public:
-		LineReader() {}
-		virtual ~LineReader() {}
+		private:
+			bool sawCr;
+			size_t waitingSize;
+			queue<const RString *> waiting;
+			queue<const RString *> lines;
 
-		// Returns true if the stream is open. If this method returns false,
-		// the caller may assume that the stream is permanently closed.
-		virtual bool IsOpen() = 0;
+			inline bool splitAtLineEnding(const RString& input, const RString ** left, RChar * found, const RString ** right) {
+				size_t result = input.find_first_of("\x0A\x0D");
+				if(result == RString::npos) {
+					return false;
+				}
+				else {
+					if(left != NULL) {
+						*left = new RString(input.substr(0, result));
+					}
+					if(found != NULL) {
+						*found = input[result];
+					}
+					if(right != NULL) {
+						*right = new RString(input.substr(result + 1));
+					}
+					return true;
+				}
+			}
 
-		// Reads a line from input and assigns it to the provided string
-		// object. The newline at the end should be omitted.
-		//
-		// Returns true if a line was read.
-		// Returns false (with no particular value for line) if the line
-		// read failed with an error or EOF condition, or if a nonblocking
-		// or timeout-blocking read returned with no data, or if the stream
-		// is closed. Call IsOpen() to determine whether to continue
-		// reading. (The suggested timeout for reads is DEFAULT_TIMEOUT_MS.)
-		//
-		// Implementations whose underlying streams are essentially
-		// unreadable after certain unrecoverable conditions (like EOF or
-		// some kinds of error) should call Close() on themselves so that
-		// resources are freed and so IsOpen() no longer returns true.
-		virtual bool ReadLine(RString& line) = 0;
+			// Add an already allocated object
+			inline void pushWaiting(const RString * value) {
+				if(value != NULL) {
+					waiting.push(value);
+					waitingSize += value->length();
+				}
+			}
 
-		// If the underlying stream is closeable, close the stream. Calling
-		// this on a stream that is not open must be harmless.
-		virtual void Close() {}
+			inline const RString * shiftWaiting() {
+				if(waiting.empty()) {
+					return NULL;
+				}
+				const RString * item = waiting.front();
+				waiting.pop();
+				return item;
+			}
+
+			inline void pushLines(const RString * value) {
+				if(value != NULL) {
+					lines.push(value);
+				}
+			}
+
+			inline const RString * shiftLines() {
+				if(lines.empty()) {
+					return NULL;
+				}
+				const RString * item = lines.front();
+				lines.pop();
+				return item;
+			}
+
+			inline void flushWaiting() {
+				if(!waiting.empty()) {
+					RString * joined = new RString();
+					joined->reserve(waitingSize);
+					
+					while(!waiting.empty()) {
+						const RString * item = shiftWaiting();
+						*joined += *item;
+						delete item;
+					}
+
+					waitingSize = 0;
+					pushLines(joined);
+				}
+			}
+
+			inline void clearWaiting() {
+				const RString * item;
+				while((item = shiftWaiting()) != NULL) {
+					delete item;
+				}
+				waitingSize = 0;
+			}
+
+			inline void clearLines() {
+				const RString * item;
+				while((item = shiftLines()) != NULL) {
+					delete item;
+				}
+			}
+
+			// Responsibility for deleting this topic is taken over by us.
+			bool addData(const RString * topic) {
+				const RString * left;
+				const RString * right;
+				RChar found;
+
+				while(splitAtLineEnding(*topic, &left, &found, &right)) {
+					delete topic;
+					topic = right;
+
+					if(sawCr && left->empty() && found == 0x0A) {
+						// Discard LF after CR
+						sawCr = false;
+						delete left;
+					}
+					else {
+						sawCr = (found == 0x0D);
+						pushWaiting(left);
+						flushWaiting();
+					}
+				}
+
+				if(topic->empty()) {
+					delete topic;
+				}
+				else {
+					pushWaiting(topic);
+				}
+
+				return HasNext();
+			}
+
+		public:
+			LineBuffer() :
+				sawCr(false),
+				waitingSize(0)
+			{
+			}
+
+			~LineBuffer() {
+				clearWaiting();
+				clearLines();
+			}
+
+			bool AddData(const RString& data) {
+				return addData(new RString(data));
+			}
+
+			bool AddData(const RChar * data, size_t length) {
+				return addData(new RString(data, length));
+			}
+
+			// Put all currently pending data to a line, even if there is no
+			// line ending found. Use (for example) to get the last line of a
+			// file that has no line ending at EOF.
+			void Flush() {
+				flushWaiting();
+			}
+
+			bool HasNext() {
+				return !lines.empty();
+			}
+
+			// Get the next buffered line.
+			// Caller takes over pointer.
+			const RString * Next() {
+				return shiftLines();
+			}
+
+			// Get the next buffered line.
+			// Caller gets a copy of line; we delete the original.
+			// Returns false if there was no line.
+			bool Next(RString& line) {
+				const RString * item = shiftLines();
+				if(item == NULL) {
+					return false;
+				}
+				else {
+					line = *item;
+					delete item;
+					return true;
+				}
+			}
 	};
 
 
+	// Abstract interface for object that retrieves lines from a stream.
+	class LineReader
+	{
+		public:
+			LineReader() {}
+			virtual ~LineReader() {}
+
+			// Returns true if the stream is open. If this method returns false,
+			// the caller may assume that the stream is permanently closed.
+			virtual bool IsOpen() = 0;
+
+			// Reads a line from input and assigns it to the provided string
+			// object. The newline at the end should be omitted.
+			//
+			// Returns true if a line was read.
+			// Returns false (with no particular value for line) if the line
+			// read failed with an error or EOF condition, or if a nonblocking
+			// or timeout-blocking read returned with no data, or if the stream
+			// is closed. Call IsOpen() to determine whether to continue
+			// reading. (The suggested timeout for reads is DEFAULT_TIMEOUT_MS.)
+			//
+			// Implementations whose underlying streams are essentially
+			// unreadable after certain unrecoverable conditions (like EOF or
+			// some kinds of error) should call Close() on themselves so that
+			// resources are freed and so IsOpen() no longer returns true.
+			virtual bool ReadLine(RString& line) = 0;
+
+			// If the underlying stream is closeable, close the stream. Calling
+			// this on a stream that is not open must be harmless.
+			virtual void Close() {}
+	};
+
+
+	// Retrieves lines from a cstdio (std::FILE) stream.
 	class StdCFileLineReader : public LineReader
 	{
 		private:
@@ -220,15 +403,97 @@ namespace
 			}
 	};
 
+
 #if !defined(WITHOUT_NETWORKING)
+	// Retrieves lines from a socket (EzSockets) stream.
 	class EzSocketsLineReader : public LineReader
 	{
 		private:
 			volatile bool keepRunning;
-			RString pending;
+			LineBuffer lines;
+			EzSockets * sock;
+			static const size_t BUFFER_SIZE = 64;
+			RChar readBuffer[BUFFER_SIZE];
 			RageMutex mutex;
 
-			EzSockets * sock;
+			inline void shutdown(bool flushWaitingLines) {
+				// Cause ReadLine to stop on next cycle.
+				keepRunning = false;
+
+				mutex.Lock();
+
+				if(sock != NULL) {
+					if(IsOpen()) {
+						sock->close();
+					}
+					delete sock;
+					sock = NULL;
+
+					// Only skip this from destructor
+					if(flushWaitingLines) {
+						lines.Flush();
+					}
+				}
+
+				mutex.Unlock();
+			}
+
+			inline bool unlockedReadLine(RString& line) {
+				// If the buffer already contains a line
+				if(lines.Next(line)) {
+					return true;
+				}
+
+				// If the buffer contains no full lines
+				{
+					size_t readLen;
+
+					while(keepRunning && IsOpen()) {
+						readLen = sock->DataAvailable(DEFAULT_TIMEOUT_MS) ?
+							sock->ReadData((char*)readBuffer, sizeof(readBuffer)) : 0;
+
+						if(readLen > 0) {
+							if(lines.AddData(readBuffer, readLen)) {
+								lines.Next(line);
+								return true;
+							}
+						}
+						else {
+							// No data was read.
+
+							// We don't have a meaningful way to recover
+							// from an "exceptional condition", so an error
+							// stops the loop.
+							if(sock->IsError()) {
+								keepRunning = false;
+							}
+
+							// If this object was closed independently, the
+							// loop will stop on the next check anyway.
+							// (Close() clears keepRunning outside of the
+							// mutex.)
+
+							// If the socket is open and not in an error
+							// state, then it simply had no data to return.
+							// So, we try again immediately. The timeout
+							// parameter to DataAvailable() prevents this
+							// from being full-fledged busy waiting.
+						}
+					}
+				}
+				
+				// At this point, the object should no longer receive input.
+				// If the loop stopped due to keepRunning being set to false
+				// (including when the socket has an error), the socket may
+				// still be open.
+				// Close() clears keepRunning, closes the socket, and
+				// flushes remaining input to lines. (It can be repeated
+				// safely.)
+				Close();
+
+				// There might be a line in the buffer after the flush.
+				return lines.Next(line);
+			}
 
 		public:
 			EzSocketsLineReader(EzSockets * sock) :
@@ -236,76 +501,31 @@ namespace
 				mutex(mutexName("InputHandler_SextetStream_EzSocketsLineReader", this))
 			{
 				this->sock = sock;
-				pending = "";
 			}
 
 			~EzSocketsLineReader() {
-				Close();
+				shutdown(false);
 			}
 
 			virtual bool IsOpen() {
 				return ((sock != NULL) && (sock->state != EzSockets::skDISCONNECTED));
 			}
 
-			inline bool unlockedReadLine(RString& line) {
-				line = "";
-
-				XXXIf pending contains a newline, let A=the part before, B=the part after
-				XXXlet pending = B, line = A; return true
-				{
-					uint8_t buffer[32];
-					size_t readLen;
-
-					while(keepRunning && IsOpen()) {
-						//XXX
-						if(X_DATAAVAILABLEWITHTIMEOUT_DEFAULT_TIMEOUT_MS_X) {
-							readLen = XREADINTObufferX;
-							XSCANLINEFORNEWLINECHAR
-							if(LINEHASNEWLINECHAR) {
-								X Let A=the part before the newline, B=the part after
-								X line += A
-								X pending = B
-								break;
-							}
-							else {
-								X line += substr(buffer, 0, readLen)
-								// Allow loop to continue
-							}
-						}
-						// Else no data is available.
-						XISITANERROROREOF?
-					}
-				}
-			}
-
 			virtual bool ReadLine(RString& line) {
 				bool result = false;
-				if(keepRunning && IsOpen()) {
-					mutex.Lock();
-					result = unlockedReadLine(line);
-					mutex.Unlock();
-				}
+				mutex.Lock();
+				result = unlockedReadLine(line);
+				mutex.Unlock();
 				return result;
 			}
 
 			virtual void Close() {
-				// Encourage any running ReadLine to stop trying
-				keepRunning = false;
-
-				if(sock != NULL) {
-					mutex.Lock();
-					if(sock != NULL) {
-						if(IsOpen()) {
-							sock->close();
-						}
-						delete sock;
-						sock = NULL;
-					}
-					mutex.Unlock();
-				}
+				shutdown(true);
 			}
 	};
 #endif // !defined(WITHOUT_NETWORKING)
+
+
 }
 
 namespace
@@ -318,8 +538,8 @@ namespace
 
 		public:
 			TakeOneLineReader(LineReader * reader) :
-				mutex(mutexName("InputHandler_SextetStream_TakeOneLineReader", this)),
-				item(reader)
+				item(reader),
+				mutex(mutexName("InputHandler_SextetStream_TakeOneLineReader", this))
 			{
 				this->item = item;
 			}
