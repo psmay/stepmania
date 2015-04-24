@@ -33,7 +33,7 @@ using namespace std;
 typedef RString::value_type Sextet;
 
 
-inline bool IsValidSextet(Sextet s)
+inline bool isValidSextet(Sextet s)
 {
 	return ((s >= 0x30) && (s <= 0x6F));
 }
@@ -41,7 +41,7 @@ inline bool IsValidSextet(Sextet s)
 // Removes a trailing line ending (CRLF, CR, or LF).
 // Returns true if any line ending was found and removed.
 // Returns false if no line ending was found.
-inline bool Chomp(RString& line)
+inline bool chomp(RString& line)
 {
 	size_t len = line.length();
 	size_t newlineSize = 0;
@@ -75,13 +75,16 @@ inline bool Chomp(RString& line)
 }
 
 // For mutex naming
-inline RString PointerAsHex(void * p)
+inline RString pointerAsHex(const void * p)
 {
-	RString result;
-	char buffer[sizeof(void*) * 2 + 1];
-	snprintf(buffer, sizeof(buffer), "%x", (unsigned int)p);
-	result = buffer;
-	return result;
+	char buffer[32];
+	snprintf(buffer, sizeof(buffer), "%p", p);
+	return RString(buffer);
+}
+
+inline RString mutexName(const RString& name, const void * p)
+{
+	return name + "(" + pointerAsHex(p) + ")";
 }
 
 
@@ -193,7 +196,7 @@ namespace
 						// If a line was fully read (i.e., it ends with a
 						// newline), rather than just partially, we can stop
 						// here
-						if(Chomp(line)) {
+						if(chomp(line)) {
 							break;
 						}
 					}
@@ -221,13 +224,17 @@ namespace
 	class EzSocketsLineReader : public LineReader
 	{
 		private:
+			volatile bool keepRunning;
 			RString pending;
+			RageMutex mutex;
 
-		protected:
 			EzSockets * sock;
 
 		public:
-			EzSocketsLineReader(EzSockets * sock) {
+			EzSocketsLineReader(EzSockets * sock) :
+				keepRunning(true),
+				mutex(mutexName("InputHandler_SextetStream_EzSocketsLineReader", this))
+			{
 				this->sock = sock;
 				pending = "";
 			}
@@ -240,24 +247,64 @@ namespace
 				return ((sock != NULL) && (sock->state != EzSockets::skDISCONNECTED));
 			}
 
-			virtual bool ReadLine(RString& line) {
-				char buffer[64];
-				XXX
-				USE CanRead(usec timeout) to block interruptibly for read
-				return atLeastOneSuccessfulRead;
+			inline bool unlockedReadLine(RString& line) {
+				line = "";
 
+				XXXIf pending contains a newline, let A=the part before, B=the part after
+				XXXlet pending = B, line = A; return true
+				{
+					uint8_t buffer[32];
+					size_t readLen;
+
+					while(keepRunning && IsOpen()) {
+						//XXX
+						if(X_DATAAVAILABLEWITHTIMEOUT_DEFAULT_TIMEOUT_MS_X) {
+							readLen = XREADINTObufferX;
+							XSCANLINEFORNEWLINECHAR
+							if(LINEHASNEWLINECHAR) {
+								X Let A=the part before the newline, B=the part after
+								X line += A
+								X pending = B
+								break;
+							}
+							else {
+								X line += substr(buffer, 0, readLen)
+								// Allow loop to continue
+							}
+						}
+						// Else no data is available.
+						XISITANERROROREOF?
+					}
+				}
+			}
+
+			virtual bool ReadLine(RString& line) {
+				bool result = false;
+				if(keepRunning && IsOpen()) {
+					mutex.Lock();
+					result = unlockedReadLine(line);
+					mutex.Unlock();
+				}
+				return result;
 			}
 
 			virtual void Close() {
-				if(IsOpen()) {
-					sock->close();
-				}
+				// Encourage any running ReadLine to stop trying
+				keepRunning = false;
+
 				if(sock != NULL) {
-					delete sock;
-					sock = NULL;
+					mutex.Lock();
+					if(sock != NULL) {
+						if(IsOpen()) {
+							sock->close();
+						}
+						delete sock;
+						sock = NULL;
+					}
+					mutex.Unlock();
 				}
 			}
-	}
+	};
 #endif // !defined(WITHOUT_NETWORKING)
 }
 
@@ -270,11 +317,11 @@ namespace
 			RageMutex mutex;
 
 		public:
-			TakeOneLineReader(LineReader * item) :
-				mutex("InputHandler_SextetStream_TakeOneLineReader")
+			TakeOneLineReader(LineReader * reader) :
+				mutex(mutexName("InputHandler_SextetStream_TakeOneLineReader", this)),
+				item(reader)
 			{
 				this->item = item;
-				mutex.SetName(RString("InputHandler_SextetStream_TakeOneLineReader(") + PointerAsHex(this) + ")");
 			}
 
 			LineReader * Take()
@@ -372,7 +419,7 @@ namespace
 				// range (0x30..0x6F) are skipped.
 				for(i = 0; i < lineLen; ++i) {
 					char b = line[i];
-					if(IsValidSextet(b)) {
+					if(isValidSextet(b)) {
 						buffer[cursor] = b;
 						++cursor;
 						if(cursor >= STATE_BUFFER_SIZE) {
