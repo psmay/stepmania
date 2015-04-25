@@ -21,37 +21,46 @@
 #include "ezsockets.h"
 #endif
 
+namespace X_LightsDriver_SextetStream
+{
+	class Impl;
+}
+
 class LightsDriver_SextetStream : public LightsDriver
 {
-public:
-	LightsDriver_SextetStream();
-	virtual ~LightsDriver_SextetStream();
-	virtual void Set(const LightsState *ls);
-protected:
-	void * _impl;
+	public:
+		LightsDriver_SextetStream();
+		virtual ~LightsDriver_SextetStream();
+		virtual void Set(const LightsState *ls);
+
+	protected:
+		X_LightsDriver_SextetStream::Impl * _impl;
+
+	private:
+		friend class X_LightsDriver_SextetStream::Impl;
 };
 
 class LightsDriver_SextetStreamToFile : public LightsDriver_SextetStream
 {
-public:
-	LightsDriver_SextetStreamToFile();
-	LightsDriver_SextetStreamToFile(const RString& filename);
+	public:
+		LightsDriver_SextetStreamToFile();
+		LightsDriver_SextetStreamToFile(const RString& filename);
 
-	// The file object passed here should already be open, and will be
-	// flushed, closed, and deleted in the destructor.
-	LightsDriver_SextetStreamToFile(RageFile * file);
+		// The file object passed here should already be open, and will be
+		// flushed, closed, and deleted in the destructor.
+		LightsDriver_SextetStreamToFile(RageFile * file);
 };
 
 #if !defined(WITHOUT_NETWORKING)
 class LightsDriver_SextetStreamToSocket : public LightsDriver_SextetStream
 {
-public:
-	LightsDriver_SextetStreamToSocket();
-	LightsDriver_SextetStreamToSocket(const RString& host, unsigned short port);
+	public:
+		LightsDriver_SextetStreamToSocket();
+		LightsDriver_SextetStreamToSocket(const RString& host, unsigned short port);
 
-	// The socket object passed here should already be open, and will be
-	// flushed, closed, and deleted in the destructor.
-	LightsDriver_SextetStreamToSocket(EzSockets * sock);
+		// The socket object passed here should already be open, and will be
+		// flushed, closed, and deleted in the destructor.
+		LightsDriver_SextetStreamToSocket(EzSockets * sock);
 };
 #endif // !defined(WITHOUT_NETWORKING)
 
