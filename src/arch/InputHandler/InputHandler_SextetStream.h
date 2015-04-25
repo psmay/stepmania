@@ -8,19 +8,23 @@
 #include "ezsockets.h"
 #endif // !defined(WITHOUT_NETWORKING)
 
+namespace X_InputHandler_SextetStream {
+	class Impl;
+}
+
 class InputHandler_SextetStream: public InputHandler
 {
-public:
-	InputHandler_SextetStream();
-	virtual ~InputHandler_SextetStream();
-	//virtual void Update();
-	virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut);
+	public:
+		InputHandler_SextetStream();
+		virtual ~InputHandler_SextetStream();
+		//virtual void Update();
+		virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut);
 
-	// Pretend this is private
-	void _impl_ext(void *);
+	protected:
+		X_InputHandler_SextetStream::Impl * _impl;
 
-protected:
-	void * _impl;
+	private:
+		friend class X_InputHandler_SextetStream::Impl;
 };
 
 // Note: InputHandler_SextetStreamFromFile uses blocking I/O. For the
@@ -33,32 +37,32 @@ protected:
 // continue flag.
 class InputHandler_SextetStreamFromFile: public InputHandler_SextetStream
 {
-public:
-	// Note: In the current implementation, the filename (either the
-	// `filename` parameter or the `SextetStreamInputFilename` setting) is
-	// passed to fopen(), not a RageFile ctor, so specify the file to be
-	// opened on the actual filesystem instead of the mapped filesystem. (I
-	// couldn't get RageFile to work here, possibly because I haven't
-	// determined how to disable buffering on an input file.) 
-	InputHandler_SextetStreamFromFile();
-	InputHandler_SextetStreamFromFile(const RString& filename);
+	public:
+		// Note: In the current implementation, the filename (either the
+		// `filename` parameter or the `SextetStreamInputFilename` setting) is
+		// passed to fopen(), not a RageFile ctor, so specify the file to be
+		// opened on the actual filesystem instead of the mapped filesystem. (I
+		// couldn't get RageFile to work here, possibly because I haven't
+		// determined how to disable buffering on an input file.) 
+		InputHandler_SextetStreamFromFile();
+		InputHandler_SextetStreamFromFile(const RString& filename);
 
-	// The file object passed here must already be open and buffering should
-	// be disabled. The file object will be closed in the destructor.
-	InputHandler_SextetStreamFromFile(std::FILE * file);
+		// The file object passed here must already be open and buffering should
+		// be disabled. The file object will be closed in the destructor.
+		InputHandler_SextetStreamFromFile(std::FILE * file);
 };
 
 #if !defined(WITHOUT_NETWORKING)
 class InputHandler_SextetStreamFromSocket: public InputHandler_SextetStream
 {
-public:
-	InputHandler_SextetStreamFromSocket();
-	InputHandler_SextetStreamFromSocket(const RString& host, unsigned short port);
+	public:
+		InputHandler_SextetStreamFromSocket();
+		InputHandler_SextetStreamFromSocket(const RString& host, unsigned short port);
 
-	// The socket object passed here must already be open, with blocking set
-	// to false. The socket object will be closed and deleted in the
-	// destructor.
-	InputHandler_SextetStreamFromSocket(EzSockets * sock);
+		// The socket object passed here must already be open, with blocking set
+		// to false. The socket object will be closed and deleted in the
+		// destructor.
+		InputHandler_SextetStreamFromSocket(EzSockets * sock);
 };
 #endif // !defined(WITHOUT_NETWORKING)
 

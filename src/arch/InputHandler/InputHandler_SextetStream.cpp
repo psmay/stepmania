@@ -12,6 +12,7 @@
 #include <queue>
 
 using namespace std;
+using namespace X_InputHandler_SextetStream;
 
 // In so many words, ceil(n/6).
 #define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
@@ -32,64 +33,68 @@ using namespace std;
 
 #define STATE_BUFFER_SIZE NUMBER_OF_SEXTETS_FOR_BIT_COUNT(BUTTON_COUNT)
 
-typedef RString::value_type Sextet;
-typedef RString::value_type RChar;
 
-
-inline bool isValidSextet(Sextet s)
+namespace
 {
-	return ((s >= 0x30) && (s <= 0x6F));
-}
+	typedef RString::value_type Sextet;
+	typedef RString::value_type RChar;
 
-// Removes a trailing line ending (CRLF, CR, or LF).
-// Returns true if any line ending was found and removed.
-// Returns false if no line ending was found.
-inline bool chomp(RString& line)
-{
-	size_t len = line.length();
-	size_t newlineSize = 0;
-	const Sextet CR = 0xD;
-	const Sextet LF = 0xA;
+	inline bool isValidSextet(Sextet s)
+	{
+		return ((s >= 0x30) && (s <= 0x6F));
+	}
 
-	if(len >= 1) {
-		Sextet last = line[len - 1];
+	// Removes a trailing line ending (CRLF, CR, or LF).
+	// Returns true if any line ending was found and removed.
+	// Returns false if no line ending was found.
+	inline bool chomp(RString& line)
+	{
+		size_t len = line.length();
+		size_t newlineSize = 0;
+		const Sextet CR = 0xD;
+		const Sextet LF = 0xA;
 
-		if(last == LF) {
-			if(len >= 2 && line[len - 2] == CR) {
-				// CRLF
-				newlineSize = 2;
+		if(len >= 1) {
+			Sextet last = line[len - 1];
+
+			if(last == LF) {
+				if(len >= 2 && line[len - 2] == CR) {
+					// CRLF
+					newlineSize = 2;
+				}
+				else {
+					// LF
+					newlineSize = 1;
+				}
 			}
-			else {
-				// LF
+			else if(last == CR) {
+				// CR
 				newlineSize = 1;
 			}
 		}
-		else if(last == CR) {
-			// CR
-			newlineSize = 1;
+
+		if(newlineSize > 0) {
+			line.resize(len - newlineSize);
+			return true;
 		}
+		return false;
 	}
 
-	if(newlineSize > 0) {
-		line.resize(len - newlineSize);
-		return true;
+	// For mutex naming
+	inline RString pointerAsHex(const void * p)
+	{
+		char buffer[32];
+		snprintf(buffer, sizeof(buffer), "%p", p);
+		return RString(buffer);
 	}
-	return false;
-}
 
-// For mutex naming
-inline RString pointerAsHex(const void * p)
-{
-	char buffer[32];
-	snprintf(buffer, sizeof(buffer), "%p", p);
-	return RString(buffer);
+	// Automatically generates a mutex name based on a differentiating string
+	// and the address of an object serving as its topic.
+	inline RString mutexName(const RString& name, const void * p)
+	{
+		return name + "(" + pointerAsHex(p) + ")";
+	}
 }
-
-inline RString mutexName(const RString& name, const void * p)
-{
-	return name + "(" + pointerAsHex(p) + ")";
-}
-
 
 namespace
 {
@@ -158,7 +163,7 @@ namespace
 				if(!waiting.empty()) {
 					RString * joined = new RString();
 					joined->reserve(waitingSize);
-					
+
 					while(!waiting.empty()) {
 						const RString * item = shiftWaiting();
 						*joined += *item;
@@ -302,8 +307,10 @@ namespace
 			// this on a stream that is not open must be harmless.
 			virtual void Close() {}
 	};
+}
 
-
+namespace
+{
 	// Retrieves lines from a cstdio (std::FILE) stream.
 	class StdCFileLineReader : public LineReader
 	{
@@ -402,9 +409,11 @@ namespace
 				return atLeastOneSuccessfulRead;
 			}
 	};
-
+}
 
 #if !defined(WITHOUT_NETWORKING)
+namespace
+{
 	// Retrieves lines from a socket (EzSockets) stream.
 	class EzSocketsLineReader : public LineReader
 	{
@@ -481,7 +490,7 @@ namespace
 						}
 					}
 				}
-				
+
 				// At this point, the object should no longer receive input.
 				// If the loop stopped due to keepRunning being set to false
 				// (including when the socket has an error), the socket may
@@ -523,10 +532,8 @@ namespace
 				shutdown(true);
 			}
 	};
-#endif // !defined(WITHOUT_NETWORKING)
-
-
 }
+#endif // !defined(WITHOUT_NETWORKING)
 
 namespace
 {
@@ -556,8 +563,10 @@ namespace
 	};
 }
 
-namespace
+namespace X_InputHandler_SextetStream
 {
+	static Impl * CreateImpl(InputHandler_SextetStream * _this, LineReader * reader);
+
 	class Impl
 	{
 		private:
@@ -565,15 +574,14 @@ namespace
 			TakeOneLineReader takeReader;
 
 		protected:
-			void ButtonPressed(const DeviceInput& di)
-			{
-				const DeviceInput * pdi = &di;
-				handler->_impl_ext(&pdi);
-			}
-
 			uint8_t stateBuffer[STATE_BUFFER_SIZE];
 			RageThread inputThread;
 			bool continueInputThread;
+
+			void ButtonPressed(const DeviceInput& di)
+			{
+				handler->ButtonPressed(di);
+			}
 
 			inline void clearStateBuffer()
 			{
@@ -595,7 +603,6 @@ namespace
 				}
 			}
 
-		public:
 			Impl(InputHandler_SextetStream * _this, LineReader * reader) :
 				handler(_this), takeReader(reader)
 			{
@@ -606,6 +613,8 @@ namespace
 				clearStateBuffer();
 				createThread();
 			}
+
+		public:
 
 			virtual ~Impl()
 			{
@@ -737,21 +746,21 @@ namespace
 				}
 				disposeReader(reader);
 			}
+
+			friend Impl * CreateImpl(InputHandler_SextetStream * _this, LineReader * reader);
 	};
+
+	static Impl * CreateImpl(InputHandler_SextetStream * _this, LineReader * reader)
+	{
+		return new Impl(_this, reader);
+	}
 }
 
-#define IMPL ((Impl*)_impl)
-
-void InputHandler_SextetStream::_impl_ext(void * p)
-{
-	const DeviceInput ** ppdi = (const DeviceInput **)p;
-	ButtonPressed(**ppdi);
-}
 
 void InputHandler_SextetStream::GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
 {
-	if(IMPL != NULL) {
-		IMPL->GetDevicesAndDescriptions(vDevicesOut);
+	if(_impl != NULL) {
+		_impl->GetDevicesAndDescriptions(vDevicesOut);
 	}
 }
 
@@ -762,8 +771,8 @@ InputHandler_SextetStream::InputHandler_SextetStream()
 
 InputHandler_SextetStream::~InputHandler_SextetStream()
 {
-	if(IMPL != NULL) {
-		delete IMPL;
+	if(_impl != NULL) {
+		delete _impl;
 	}
 }
 
@@ -781,17 +790,17 @@ static Preference<RString> g_sSextetStreamInputFilename("SextetStreamInputFilena
 
 InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(FILE * file)
 {
-	_impl = new Impl(this, new StdCFileLineReader(file));
+	_impl = CreateImpl(this, new StdCFileLineReader(file));
 }
 
 InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(const RString& filename)
 {
-	_impl = new Impl(this, StdCFileLineReader::Open(filename));
+	_impl = CreateImpl(this, StdCFileLineReader::Open(filename));
 }
 
 InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile()
 {
-	_impl = new Impl(this, StdCFileLineReader::Open(g_sSextetStreamInputFilename));
+	_impl = CreateImpl(this, StdCFileLineReader::Open(g_sSextetStreamInputFilename));
 }
 
 
@@ -823,19 +832,19 @@ inline LineReader * openInputSocket(const RString& host, unsigned short port)
 
 InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket(EzSockets * sock)
 {
-	_impl = new Impl(this, new EzSocketsLineReader(sock));
+	_impl = CreateImpl(this, new EzSocketsLineReader(sock));
 }
 
 InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket(const RString& host, unsigned short port)
 {
-	_impl = new Impl(this, openInputSocket(host, port));
+	_impl = CreateImpl(this, openInputSocket(host, port));
 }
 
 InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket()
 {
 	RString host = g_sSextetStreamInputSocketHost;
 	int port = g_sSextetStreamInputSocketPort;
-	_impl = new Impl(this, openInputSocket(host, (unsigned short)port));
+	_impl = CreateImpl(this, openInputSocket(host, (unsigned short)port));
 }
 
 #endif // !defined(WITHOUT_NETWORKING)
