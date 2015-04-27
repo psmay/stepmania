@@ -92,8 +92,12 @@ namespace
 	// and the address of an object serving as its topic.
 	inline RString mutexName(const RString& name, const void * p)
 	{
-		return name + "(" + pointerAsHex(p) + ")";
+		return RString("InputHandler_SextetStream@") + name + "(" + pointerAsHex(p) + ")";
 	}
+
+	const RChar CR = 0x0D;
+	const RChar LF = 0x0A;
+	const RChar * CRLF = "\x0D\x0A";
 }
 
 namespace
@@ -104,12 +108,27 @@ namespace
 	{
 		private:
 			bool sawCr;
-			size_t waitingSize;
-			queue<const RString *> waiting;
+			bool beganLine;
+			RString * partialLine;
 			queue<const RString *> lines;
 
-			inline bool splitAtLineEnding(const RString& input, const RString ** left, RChar * found, const RString ** right) {
-				size_t result = input.find_first_of("\x0A\x0D");
+			// Given a sequence of input characters, finds the first CR or
+			// LF and assigns it to *found. The parts of the input to the
+			// left and right of that character are assigned to *left and
+			// *right, respectively, as newly allocated strings. Then, true
+			// is returned.
+			//
+			// Any of left, right, or found may be NULL. If left or right is
+			// NULL, the new string object is not created for that side.
+			//
+			// If the input string contains no CR or LF, *left, *found, and
+			// *right remain unchanged and false is returned.
+			static inline bool splitAtLineEnding(const RString& input,
+				const RString ** left,
+				RChar * found,
+				const RString ** right)
+			{
+				size_t result = input.find_first_of(CRLF);
 				if(result == RString::npos) {
 					return false;
 				}
@@ -127,29 +146,26 @@ namespace
 				}
 			}
 
-			// Add an already allocated object
-			inline void pushWaiting(const RString * value) {
+			// Append value to line in progress, then delete value.
+			inline void appendAndDelete(const RString * value) {
 				if(value != NULL) {
-					waiting.push(value);
-					waitingSize += value->length();
+					if(partialLine == NULL)
+						partialLine = new RString(*value);
+					else
+						*partialLine += *value;
+
+					delete value;
 				}
 			}
 
-			inline const RString * shiftWaiting() {
-				if(waiting.empty()) {
-					return NULL;
-				}
-				const RString * item = waiting.front();
-				waiting.pop();
-				return item;
-			}
-
+			// Enqueue value as an output line.
 			inline void pushLines(const RString * value) {
 				if(value != NULL) {
 					lines.push(value);
 				}
 			}
 
+			// Dequeue an output line.
 			inline const RString * shiftLines() {
 				if(lines.empty()) {
 					return NULL;
@@ -159,30 +175,25 @@ namespace
 				return item;
 			}
 
-			inline void flushWaiting() {
-				if(!waiting.empty()) {
-					RString * joined = new RString();
-					joined->reserve(waitingSize);
-
-					while(!waiting.empty()) {
-						const RString * item = shiftWaiting();
-						*joined += *item;
-						delete item;
-					}
-
-					waitingSize = 0;
-					pushLines(joined);
+			// Move the line in progress to the output queue, regardless of
+			// whether a line ending was found. (If there is no line in
+			// progress, this is a no-op.)
+			inline void flush() {
+				if(partialLine != NULL) {
+					pushLines(partialLine);
+					partialLine = NULL;
 				}
 			}
 
-			inline void clearWaiting() {
-				const RString * item;
-				while((item = shiftWaiting()) != NULL) {
-					delete item;
+			// Discard the line in progress, if it exists.
+			inline void clearPartialLine() {
+				if(partialLine != NULL) {
+					delete partialLine;
+					partialLine = NULL;
 				}
-				waitingSize = 0;
 			}
 
+			// Discard all lines in the output queue.
 			inline void clearLines() {
 				const RString * item;
 				while((item = shiftLines()) != NULL) {
@@ -190,7 +201,8 @@ namespace
 				}
 			}
 
-			// Responsibility for deleting this topic is taken over by us.
+			// Buffer a sequence of input characters, moving lines to the
+			// lines queue as they are found.
 			bool addData(const RString * topic) {
 				const RString * left;
 				const RString * right;
@@ -200,23 +212,26 @@ namespace
 					delete topic;
 					topic = right;
 
-					if(sawCr && left->empty() && found == 0x0A) {
+					if(sawCr && left->empty() && found == LF) {
 						// Discard LF after CR
 						sawCr = false;
 						delete left;
 					}
 					else {
-						sawCr = (found == 0x0D);
-						pushWaiting(left);
-						flushWaiting();
+						sawCr = (found == CR);
+						appendAndDelete(left);
+						flush();
 					}
 				}
 
 				if(topic->empty()) {
+					// This is not appended so blank lines are not counted
+					// double. (Blank lines are counted when their line
+					// endings are encountered.)
 					delete topic;
 				}
 				else {
-					pushWaiting(topic);
+					appendAndDelete(topic);
 				}
 
 				return HasNext();
@@ -225,19 +240,21 @@ namespace
 		public:
 			LineBuffer() :
 				sawCr(false),
-				waitingSize(0)
+				partialLine(NULL)
 			{
 			}
 
 			~LineBuffer() {
-				clearWaiting();
+				clearPartialLine();
 				clearLines();
 			}
 
+			// Buffer characters copied from the given string.
 			bool AddData(const RString& data) {
 				return addData(new RString(data));
 			}
 
+			// Buffer characters copied from the given array.
 			bool AddData(const RChar * data, size_t length) {
 				return addData(new RString(data, length));
 			}
@@ -245,23 +262,30 @@ namespace
 			// Put all currently pending data to a line, even if there is no
 			// line ending found. Use (for example) to get the last line of a
 			// file that has no line ending at EOF.
+			//
+			// There is no Close() method for this object, but Flush()
+			// should usually be called from its owner's Close()-like method
+			// where applicable.
 			void Flush() {
-				flushWaiting();
+				flush();
 			}
 
+			// Return true if one or more lines are waiting to be output,
+			// false otherwise.
 			bool HasNext() {
 				return !lines.empty();
 			}
 
-			// Get the next buffered line.
-			// Caller takes over pointer.
+			// Dequeue and return the next line of output. Caller is
+			// responsible for deleting the string. Returns NULL if output
+			// buffer is empty.
 			const RString * Next() {
 				return shiftLines();
 			}
 
-			// Get the next buffered line.
-			// Caller gets a copy of line; we delete the original.
-			// Returns false if there was no line.
+			// Dequeue and copy the next line of output to the given string,
+			// then return true. Returns false if output buffer is empty.
+			// Caller is not made responsible for any new string object.
 			bool Next(RString& line) {
 				const RString * item = shiftLines();
 				if(item == NULL) {
@@ -274,8 +298,10 @@ namespace
 				}
 			}
 	};
+}
 
-
+namespace
+{
 	// Abstract interface for object that retrieves lines from a stream.
 	class LineReader
 	{
@@ -447,6 +473,24 @@ namespace
 				mutex.Unlock();
 			}
 
+			// Checked when the ReadLine loop encounters a zero-length read
+			// or no data is available
+			inline bool shouldStopRunningAfterNonRead() {
+				// We don't have a meaningful way to recover from a
+				// disconnection nor from an "exceptional condition", so a
+				// disconnect or an error stops the loop.
+
+				// If this object was closed independently, the loop will
+				// stop on the next check anyway. (Close() clears
+				// keepRunning outside of the mutex.)
+
+				// If the socket is open and not in an error state, then it
+				// simply had no data to return. So, we try again
+				// immediately. The timeout parameter to DataAvailable()
+				// prevents this from being full-fledged busy waiting.
+				return ((sock->state == EzSockets::skDISCONNECTED) || sock->IsError());
+			}
+
 			inline bool unlockedReadLine(RString& line) {
 				// If the buffer already contains a line
 				if(lines.Next(line)) {
@@ -469,35 +513,23 @@ namespace
 						}
 						else {
 							// No data was read.
-
-							// We don't have a meaningful way to recover
-							// from an "exceptional condition", so an error
-							// stops the loop.
-							if(sock->IsError()) {
+							if(shouldStopRunningAfterNonRead()) {
 								keepRunning = false;
 							}
-
-							// If this object was closed independently, the
-							// loop will stop on the next check anyway.
-							// (Close() clears keepRunning outside of the
-							// mutex.)
-
-							// If the socket is open and not in an error
-							// state, then it simply had no data to return.
-							// So, we try again immediately. The timeout
-							// parameter to DataAvailable() prevents this
-							// from being full-fledged busy waiting.
 						}
 					}
 				}
 
 				// At this point, the object should no longer receive input.
 				// If the loop stopped due to keepRunning being set to false
-				// (including when the socket has an error), the socket may
-				// still be open.
+				// (including when the socket has disconnected or errored),
+				// the socket may still be open.
+				//
 				// Close() clears keepRunning, closes the socket, and
-				// flushes remaining input to lines. (It can be repeated
-				// safely.)
+				// flushes remaining input to lines. (Also, it can be
+				// repeated safely.) The line buffer remains operational, so
+				// the remaining lines can still be retrieved from
+				// subsequent ReadLine()s.
 				Close();
 
 				// There might be a line in the buffer after the flush.
@@ -507,7 +539,7 @@ namespace
 		public:
 			EzSocketsLineReader(EzSockets * sock) :
 				keepRunning(true),
-				mutex(mutexName("InputHandler_SextetStream_EzSocketsLineReader", this))
+				mutex(mutexName("EzSocketsLineReader", this))
 			{
 				this->sock = sock;
 			}
@@ -546,7 +578,7 @@ namespace
 		public:
 			TakeOneLineReader(LineReader * reader) :
 				item(reader),
-				mutex(mutexName("InputHandler_SextetStream_TakeOneLineReader", this))
+				mutex(mutexName("TakeOneLineReader", this))
 			{
 				this->item = item;
 			}
