@@ -198,9 +198,13 @@ class InputHandler_SextetStream::Impl
 						}
 					}
 					else {
-						// Error or EOF condition.
-						LOG->Trace("Reached end of SextetStream input");
-						continueInputThread = false;
+						if(!linereader->IsValid()) {
+							// Error or EOF condition.
+							LOG->Info("Reached end of SextetStream input");
+							continueInputThread = false;
+						}
+						// Otherwise, the line simply may not have finished
+						// buffering before the timeout. Keep going.
 					}
 				}
 				LOG->Info("SextetStream input stopped");
