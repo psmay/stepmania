@@ -222,8 +222,10 @@ InputHandler = arch/InputHandler/InputHandler.cpp arch/InputHandler/InputHandler
 
 Lights = arch/Lights/LightsDriver.cpp arch/Lights/LightsDriver.h
 
-SextetsIO = arch/Sextets/IO/LineReader.h \
-	arch/Sextets/IO/StdCFileLineReader.cpp arch/Sextets/IO/StdCFileLineReader.h
+Sextets = arch/Sextets/IO/LineReader.h \
+	arch/Sextets/IO/StdCFileLineReader.cpp arch/Sextets/IO/StdCFileLineReader.h \
+	arch/Sextets/Threads/SingleUseBox.cpp arch/Sextets/Threads/SingleUseBox.h
+
 
 MemoryCard = arch/MemoryCard/MemoryCardDriver.cpp arch/MemoryCard/MemoryCardDriver.h
 
@@ -417,7 +419,7 @@ endif
 
 Arch = $(LoadingWindow) $(Sound) $(ArchHooks) $(InputHandler) $(MovieTexture) \
 	   $(Lights) $(MemoryCard) $(LowLevelWindow) $(ArchUtils) $(Dialog) $(Threads) \
-	   $(SextetsIO) \
+	   $(Sextets) \
 	   arch/arch_default.h arch/RageDriver.cpp arch/RageDriver.h
 
 RageSoundFileReaders = RageSoundReader_WAV.cpp RageSoundReader_WAV.h
