@@ -6,12 +6,15 @@
 #include "RageUtil.h"
 
 #include "arch/Sextets/IO/StdCFileLineReader.h"
+#include "arch/Sextets/Threads/SingleReadPointerVariable.h"
 
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
 
 using namespace std;
+using namespace Sextets::IO;
+using namespace Sextets::Threads;
 
 // In so many words, ceil(n/6).
 #define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
@@ -31,84 +34,81 @@ using namespace std;
 #define STATE_BUFFER_SIZE NUMBER_OF_SEXTETS_FOR_BIT_COUNT(BUTTON_COUNT)
 
 
-
-class InputHandler_SextetStream::Impl
+// The guts of an InputHandler_SextetStream based on a LineReader.
+class InputHandler_SextetStream::_Impl
 {
 	private:
 		InputHandler_SextetStream * handler;
+		SingleReadPointerVariable<LineReader> readerVar;
 
-	protected:
-		void ButtonPressed(const DeviceInput& di)
+		uint8_t currentState[STATE_BUFFER_SIZE];
+		RageThread inputThread;
+		bool continueInputLoop;
+
+		inline void updateButtonState(const InputDevice& device,
+			size_t buttonIndex, bool value, const RageTimer& now)
 		{
+			DeviceInput di(device, deviceButtonForIndex(buttonIndex), value, now);
 			handler->ButtonPressed(di);
 		}
 
-		uint8_t stateBuffer[STATE_BUFFER_SIZE];
-		RageThread inputThread;
-		bool continueInputThread;
-
-		// Construct and return the LineReader that makes sense for this
-		// object. getLineReader() calls this; if the returned object claims
-		// it is valid, it is returned. Otherwise, it is destroyed and NULL
-		// is returned.
-		virtual Sextets::IO::LineReader * getUnvalidatedLineReader() = 0;
-
-		inline void clearStateBuffer()
+		inline void clearCurrentState()
 		{
-			memset(stateBuffer, 0, STATE_BUFFER_SIZE);
+			memset(currentState, 0, STATE_BUFFER_SIZE);
 		}
 
 		inline void createThread()
 		{
-			continueInputThread = true;
+			continueInputLoop = true;
 			inputThread.SetName("SextetStream input thread");
-			inputThread.Create(StartInputThread, this);
+			inputThread.Create(runInputLoopThread, this);
 		}
 
-		Sextets::IO::LineReader * getLineReader()
+		void runInputLoop()
 		{
-			Sextets::IO::LineReader * linereader = getUnvalidatedLineReader();
-			if(linereader != NULL) {
-				if(!linereader->IsValid()) {
-					delete linereader;
-					linereader = NULL;
+			RString line;
+			Sextets::IO::LineReader * reader;
+
+			LOG->Trace("Input thread started; getting line reader");
+			reader = readerVar.Claim();
+
+			if(reader == NULL) {
+				LOG->Warn("Line reader for SextetStream input missing or already used");
+			}
+			else {
+				LOG->Trace("Got line reader");
+				while(continueInputLoop) {
+					LOG->Trace("Reading line");
+					if(reader->ReadLine(line)) {
+						LOG->Trace("Got line: '%s'", line.c_str());
+						if(line.length() > 0) {
+							uint8_t newState[STATE_BUFFER_SIZE];
+							getNewState(newState, line);
+							updateButtonsWithStateChanges(newState);
+						}
+					}
+					else {
+						if(!reader->IsValid()) {
+							// Error or EOF condition.
+							LOG->Info("Reached end of SextetStream input");
+							continueInputLoop = false;
+						}
+						// Otherwise, the line simply may not have finished
+						// buffering before the timeout. Keep going.
+					}
 				}
-			}
-			return linereader;
-		}
-
-	public:
-		Impl(InputHandler_SextetStream * _this)
-		{
-			LOG->Info("Number of button states supported by current InputHandler_SextetStream: %u",
-				(unsigned)BUTTON_COUNT);
-			continueInputThread = false;
-
-			handler = _this;
-			clearStateBuffer();
-			createThread();
-		}
-
-		virtual ~Impl()
-		{
-			if(inputThread.IsCreated()) {
-				continueInputThread = false;
-				inputThread.Wait();
+				LOG->Info("SextetStream input stopped");
+				delete reader;
 			}
 		}
 
-		virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
+		static int runInputLoopThread(void * p)
 		{
-			vDevicesOut.push_back(InputDeviceInfo(FIRST_DEVICE, "SextetStream"));
-		}
-
-		static int StartInputThread(void * p)
-		{
-			((Impl*) p)->RunInputThread();
+			((_Impl*) p)->runInputLoop();
 			return 0;
 		}
 
-		inline void GetNewState(uint8_t * buffer, RString& line)
+		inline void getNewState(uint8_t * buffer, RString& line)
 		{
 			size_t lineLen = line.length();
 			size_t i, cursor;
@@ -131,7 +131,7 @@ class InputHandler_SextetStream::Impl
 			}
 		}
 
-		inline DeviceButton ButtonAtIndex(size_t index)
+		static inline DeviceButton deviceButtonForIndex(size_t index)
 		{
 			if(index < COUNT_JOY_BUTTON) {
 				return enum_add2(FIRST_JOY_BUTTON, index);
@@ -144,72 +144,59 @@ class InputHandler_SextetStream::Impl
 			}
 		}
 
-		inline void ReactToChanges(const uint8_t * newStateBuffer)
+		inline void updateButtonsWithStateChanges(const uint8_t * newState)
 		{
-			InputDevice id = InputDevice(FIRST_DEVICE);
+			InputDevice device = InputDevice(FIRST_DEVICE);
 			uint8_t changes[STATE_BUFFER_SIZE];
 			RageTimer now;
 
 			// XOR to find differences
 			for(size_t i = 0; i < STATE_BUFFER_SIZE; ++i) {
-				changes[i] = stateBuffer[i] ^ newStateBuffer[i];
+				changes[i] = currentState[i] ^ newState[i];
 			}
 
 			// Report on changes
 			for(size_t m = 0; m < STATE_BUFFER_SIZE; ++m) {
 				for(size_t n = 0; n < 6; ++n) {
-					size_t bi = (m * 6) + n;
-					if(bi < BUTTON_COUNT) {
+					size_t buttonIndex = (m * 6) + n;
+					if(buttonIndex < BUTTON_COUNT) {
 						if(changes[m] & (1 << n)) {
-							bool value = newStateBuffer[m] & (1 << n);
-							LOG->Trace("SS button index %zu %s", bi, value ? "pressed" : "released");
-							DeviceInput di = DeviceInput(id, ButtonAtIndex(bi), value, now);
-							ButtonPressed(di);
+							bool value = newState[m] & (1 << n);
+							LOG->Trace("SS button index %zu %s", buttonIndex, value ? "pressed" : "released");
+							updateButtonState(device, buttonIndex, value, now);
 						}
 					}
 				}
 			}
 
 			// Update current state
-			memcpy(stateBuffer, newStateBuffer, STATE_BUFFER_SIZE);
+			memcpy(currentState, newState, STATE_BUFFER_SIZE);
 		}
 
-		void RunInputThread()
+	public:
+		_Impl(InputHandler_SextetStream * handler, LineReader * reader) :
+			handler(handler),
+			readerVar(reader),
+			continueInputLoop(false)
 		{
-			RString line;
-			Sextets::IO::LineReader * linereader;
+			LOG->Trace("Number of button states supported by current InputHandler_SextetStream: %u",
+				(unsigned)BUTTON_COUNT);
 
-			LOG->Trace("Input thread started; getting line reader");
-			linereader = getLineReader();
+			clearCurrentState();
+			createThread();
+		}
 
-			if(linereader == NULL) {
-				LOG->Warn("Could not open line reader for SextetStream input");
+		~_Impl()
+		{
+			if(inputThread.IsCreated()) {
+				continueInputLoop = false;
+				inputThread.Wait();
 			}
-			else {
-				LOG->Trace("Got line reader");
-				while(continueInputThread) {
-					LOG->Trace("Reading line");
-					if(linereader->ReadLine(line)) {
-						LOG->Trace("Got line: '%s'", line.c_str());
-						if(line.length() > 0) {
-							uint8_t newStateBuffer[STATE_BUFFER_SIZE];
-							GetNewState(newStateBuffer, line);
-							ReactToChanges(newStateBuffer);
-						}
-					}
-					else {
-						if(!linereader->IsValid()) {
-							// Error or EOF condition.
-							LOG->Info("Reached end of SextetStream input");
-							continueInputThread = false;
-						}
-						// Otherwise, the line simply may not have finished
-						// buffering before the timeout. Keep going.
-					}
-				}
-				LOG->Info("SextetStream input stopped");
-				delete linereader;
-			}
+		}
+
+		void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
+		{
+			vDevicesOut.push_back(InputDeviceInfo(FIRST_DEVICE, "SextetStream"));
 		}
 };
 
@@ -243,69 +230,23 @@ REGISTER_INPUT_HANDLER_CLASS (SextetStreamFromFile);
 #endif
 static Preference<RString> g_sSextetStreamInputFilename("SextetStreamInputFilename", DEFAULT_INPUT_FILENAME);
 
-namespace
-{
-	class StdCFileHandleImpl: public InputHandler_SextetStream::Impl
-	{
-		protected:
-			std::FILE * file;
-
-		public:
-			StdCFileHandleImpl(InputHandler_SextetStreamFromFile * handler, std::FILE * file) :
-				InputHandler_SextetStream::Impl(handler)
-			{
-				this->file = file;
-			}
-
-			virtual Sextets::IO::LineReader * getUnvalidatedLineReader()
-			{
-				return Sextets::IO::StdCFileLineReader::Create(this->file);
-			}
-
-			virtual ~StdCFileHandleImpl()
-			{
-				// line reader dtor will close file for us
-			}
-	};
-
-	class StdCFileNameImpl: public InputHandler_SextetStream::Impl
-	{
-		protected:
-			RString filename;
-
-		public:
-			StdCFileNameImpl(InputHandler_SextetStreamFromFile * handler, const RString& filename) :
-				InputHandler_SextetStream::Impl(handler)
-			{
-				this->filename = filename;
-			}
-
-			virtual Sextets::IO::LineReader * getUnvalidatedLineReader()
-			{
-				return Sextets::IO::StdCFileLineReader::Create(filename);
-			}
-
-			virtual ~StdCFileNameImpl()
-			{
-				// Nothing to destroy
-			}
-	};
-}
-
 
 InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(FILE * file)
 {
-	_impl = new StdCFileHandleImpl(this, file);
+	_impl = new InputHandler_SextetStreamFromFile::_Impl(this,
+		StdCFileLineReader::Create(file));
 }
 
 InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(const RString& filename)
 {
-	_impl = new StdCFileNameImpl(this, filename);
+	_impl = new InputHandler_SextetStreamFromFile::_Impl(this,
+		StdCFileLineReader::Create(filename));
 }
 
 InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile()
 {
-	_impl = new StdCFileNameImpl(this, g_sSextetStreamInputFilename);
+	_impl = new InputHandler_SextetStreamFromFile::_Impl(this,
+		StdCFileLineReader::Create(g_sSextetStreamInputFilename));
 }
 
 /*
