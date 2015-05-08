@@ -28,27 +28,49 @@ namespace Sextets
 				}
 
 				/**
-				 * @brief Attempts to read the next line from this LineReader.
+				 * @brief Reads next line from this LineReader.
 				 *
-				 * Ideally, this method should return if msTimeout passes
-				 * before a line becomes available. Actually doing this may
-				 * require some platform-specific blocking-with-timeout read
-				 * capability. This sort of thing could be implemented using
-				 * e.g. POSIX select() and Windows WaitForSingleObject(),
-				 * both of which have timeout parameters. (I get the sense
-				 * that the RageFileDriverTimeout class could be convinced
-				 * to work, but there isn't a lot of code using it, so I'm
-				 * lacking the proper examples.)
+				 * On success, the next line from this LineReader is copied
+				 * to `line` and true is returned.
 				 *
-				 * If this method does block indefinitely, almost everything
-				 * will still work, but the blocking may prevent the loop
-				 * from checking continueInputThread in a timely fashion. If
-				 * the stream ceases to produce new data before this object
-				 * is destroyed, the current thread will hang until the
-				 * other side of the connection closes the stream (or
-				 * produces a line of data). A workaround for that would be
-				 * to have the far side of the connection repeat its last
-				 * line every second or so as a keepalive.
+				 * Otherwise, `line` is unmodified and false is returned.
+				 * When this occurs, the caller should call `IsValid()` to
+				 * determine whether the next line simply was not yet
+				 * available (true) or whether this LineReader has become
+				 * unreadable (false). If false, any read loop from this
+				 * object should be stopped.
+				 *
+				 *
+				 * Ideally, an implementation of this method should block,
+				 * and should do so only until the first occurrence of one
+				 * of the following events:
+				 *
+				 * - A line has been successfully read
+				 * - msTimeout milliseconds have passed
+				 * - Close() has been called, which interrupts blocking on
+				 *   this thread
+				 *
+				 * An implementation that does not block may cause the
+				 * program to busy-wait since ReadLine() will often be
+				 * called within a tight loop. Nonblocking streams often
+				 * have a corresponding blocking monitor function (such as
+				 * POSIX `select()`, perhaps some combination of
+				 * `WaitForMultipleObjectsEx()` and `GetOverlappedResult()`
+				 * on Windows) which supports a timeout value and, in some
+				 * way, a pseudo-interrupt (for POSIX, create a separate
+				 * pipe using `pipe(2)` and allow `select()` to wait on both
+				 * it and the input stream which `Close()` can write a byte
+				 * to it to make the `select()` unblock; for Windows,
+				 * `CreatePipe()` can probably do the same trick).
+				 *
+				 * An implementation that blocks indefinitely and
+				 * uninterruptibly may usually still work, but may cause the
+				 * program to hang while closing until a new line of input
+				 * has been read. If this is the case, have the supplier of
+				 * input data to repeat the most recent line if no changes
+				 * have happened within the past second or so, in order for
+				 * the LineReader to stop blocking long enough to detect
+				 * that it must shut down.
 				 *
 				 * @retval true Success, with line set to the input line.
 				 * @retval false No line was immediately available. The
@@ -78,6 +100,22 @@ namespace Sextets
 				 * @retval false No future read from this reader can succeed.
 				 */
 				virtual bool IsValid() = 0;
+
+				/**
+				 * @brief Closes this LineReader to further input.
+				 *
+				 * This method may block until any pending internal reads in
+				 * other threads have returned. New internal reads should be
+				 * rejected effective immediately. If at all possible, a
+				 * call to this method should interrupt any blocking of an
+				 * internal read within ReadLine().
+				 * 
+				 * If this LineReader contains buffered lines, then even
+				 * after calling Close(), IsValid() should return true and
+				 * ReadLine() should succeed until the buffer has been
+				 * exhausted.
+				 */
+				virtual void Close() = 0;
 		};
 
 		/*

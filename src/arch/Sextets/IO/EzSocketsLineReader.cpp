@@ -15,9 +15,9 @@ namespace
 	class _EzSocketsLineReader: public Sextets::IO::EzSocketsLineReader
 	{
 		private:
-			// Note: After its initialization to true, keepRunning may only
-			// be set to false.
-			volatile bool keepRunning;
+			// Note: After its initialization to true, allowMoreInput may
+			// only be set to false.
+			volatile bool allowMoreInput;
 
 			EzSockets * volatile sock;
 			Sextets::IO::LineBuffer * lines;
@@ -37,7 +37,7 @@ namespace
 			inline void shutdown(bool fromDestructor = false)
 			{
 				// Cue ReadLine to stop looping
-				keepRunning = false;
+				allowMoreInput = false;
 
 				// Wait for loop to stop before continuing
 				lock();
@@ -59,7 +59,7 @@ namespace
 
 			// Called from the loop if no data or zero-length data was
 			// returned from the most recent read.
-			inline bool shouldReadAgain()
+			inline bool shouldReadSocket()
 			{
 				return socketIsConnected() && !sock->IsError();
 			}
@@ -71,46 +71,61 @@ namespace
 					return true;
 				}
 
-				// Read data into line buffer until a line appears
-				{
-					size_t readLen;
+				// Read some data into the buffer.
+				// If a line is produced, read it out.
+				// If not, return false, but don't disallow more input
+				// unless there was a problem.
+				if(allowMoreInput && shouldReadSocket()) {
+					size_t readLen = sock->DataAvailable(msTimeout) ?
+						sock->ReadData(buffer, sizeof(buffer)) : 0;
 
-					while(keepRunning && socketIsConnected()) {
-						readLen = sock->DataAvailable(msTimeout) ?
-							sock->ReadData(buffer, sizeof(buffer)) : 0;
-
-						if(readLen > 0) {
-							if(lines->AddData(buffer, readLen)) {
-								// The new data ended a line
-								lines->Next(line);
-								return true;
-							}
+					if(readLen > 0) {
+						if(lines->AddData(buffer, readLen)) {
+							// The new data ended a line
+							lines->Next(line);
+							return true;
 						}
 						else {
-							// No data was read.
-							// Is there a problem, or do we just need to
-							// wait longer?
-							if(!shouldReadAgain())
-							{
-								keepRunning = false;
-							}
+							// No line to return, but keep reader open
+							return false;
 						}
 					}
+					else {
+						// No data was read.
+						// Is there a problem, or do we just need to
+						// wait longer?
+						if(shouldReadSocket())
+						{
+							// No data added, but keep reader open
+							return false;
+						}
+						else
+						{
+							// There shall be no further input.
+							// Close() closes the socket, if open,
+							// flushes the LineBuffer, and disallows new
+							// input.
+							Close();
 
-					// At this point, there shall be no further input.
-					// The socket may still be open, so we close it here.
-					shutdown();
-
-					// shutdown() flushes any remaining buffered data as a
-					// line. If such a line exists, we read it out here.
-					return lines->Next(line);
+							// The flush may have produced a line.
+							// If so, read it out and return true.
+							// Otherwise, no line, so return false.
+							// Either way, IsValid() will return false
+							// afterward.
+							return lines->Next(line);
+						}
+					}
+				}
+				else {
+					// Cannot buffer any new data.
+					return false;
 				}
 			}
 
 		public:
 			_EzSocketsLineReader(EzSockets * sock) :
 				lines(Sextets::IO::LineBuffer::Create()),
-				keepRunning(true),
+				allowMoreInput(true),
 				mutex(Sextets::Threads::MutexNames::Make("EzSocketsLineReader", this)),
 				sock(sock)
 			{
@@ -119,6 +134,7 @@ namespace
 			virtual ~_EzSocketsLineReader()
 			{
 				shutdown(true);
+				delete lines;
 			}
 
 			virtual bool ReadLine(RString& line, size_t msTimeout)
@@ -133,7 +149,12 @@ namespace
 			virtual bool IsValid()
 			{
 				return lines->HasNext() || lines->HasPartialLine() ||
-					(keepRunning && socketIsConnected());
+					(allowMoreInput && shouldReadSocket());
+			}
+
+			virtual void Close()
+			{
+				shutdown();
 			}
 	};
 }

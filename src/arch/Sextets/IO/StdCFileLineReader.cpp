@@ -1,128 +1,168 @@
 
 #include "arch/Sextets/IO/StdCFileLineReader.h"
+#include "arch/Sextets/IO/LineBuffer.h"
+#include "arch/Sextets/Threads/MutexNames.h"
+
 #include "RageLog.h"
+#include "RageThreads.h"
 
 namespace
 {
 	class _StdCFileLineReader: public Sextets::IO::StdCFileLineReader
 	{
 		private:
-			std::FILE * file;
+			typedef std::FILE Source;
+
+			// Note: After its initialization to true, allowMoreInput may
+			// only be set to false.
+			volatile bool allowMoreInput;
+
+			Source * volatile source;
+			Sextets::IO::LineBuffer * lines;
 
 			static const size_t BUFFER_SIZE = 16;
 			char buffer[BUFFER_SIZE];
-			RString lineBuffer;
-			bool lineStarted;
 
-			void close()
-			{
-				if(file != NULL) {
-					std::fclose(file);
-					file = NULL;
-				}
+			RageMutex mutex;
+
+			inline void lock() { mutex.Lock(); }
+			inline void unlock() { mutex.Unlock(); }
+
+			inline bool sourceIsLive() {
+				return (source != NULL);
 			}
 
-			static const char CR = 0xD;
-			static const char LF = 0xA;
-
-			static inline bool isCrOrLf(char c)
+			inline static void disposeSource(Source * p)
 			{
-				return (c == CR) || (c == LF);
+				std::fclose(p);
+				// Would delete here for a C++ object
 			}
 
-			static bool chomp(RString& line)
+			inline void shutdown(bool fromDestructor = false)
 			{
-				size_t len = line.length();
-				size_t lineEndingLength = 0;
+				// Cue ReadLine to stop looping
+				allowMoreInput = false;
 
-				if((len >= 2) && (line[len - 2] == CR) && (line[len - 1] == LF)) {
-					lineEndingLength = 2;
-				}
-				else if(len >= 1)
-				{
-					if(isCrOrLf(line[len - 1])) {
-						lineEndingLength = 1;
+				// Wait for loop to stop before continuing
+				lock();
+				if(source != NULL) {
+					Source * p = source;
+					source = NULL;
+					disposeSource(p);
+
+					// If the shutdown is from the destructor, don't bother
+					// making the remaining buffer data available as lines.
+					if(!fromDestructor) {
+						lines->Flush();
 					}
 				}
-
-				if(lineEndingLength > 0) {
-					line.resize(len - lineEndingLength);
-					return true;
-				}
-				else {
-					return false;
-				}
+				unlock();
 			}
 
-			bool flushLineTo(RString& dest)
+			// Called from the loop if no data or zero-length data was
+			// returned from the most recent read.
+			inline bool shouldReadSource()
 			{
-				if(lineStarted) {
-					dest = lineBuffer;
-					lineBuffer = "";
-					lineStarted = false;
-					return true;
-				}
-				else {
-					return false;
-				}
+				return sourceIsLive() && !std::feof(source) && !std::ferror(source);
 			}
 
-
-			bool isUnderlyingStreamLive()
+			inline size_t readSource(char * buffer, size_t bufferSize, size_t msTimeout)
 			{
-				if(file == NULL) {
+				// timeout not supported
+				return (std::fgets(buffer, bufferSize, source) != NULL) ?
+					strnlen(buffer, bufferSize) : 0;
+			}
+
+			inline bool nosyncReadLine(RString& line, size_t msTimeout)
+			{
+				// Read out a buffered line first, if any
+				if(lines->Next(line)) {
+					return true;
+				}
+
+				// Read some data into the buffer.
+				// If a line is produced, read it out.
+				// If not, return false, but don't disallow more input
+				// unless there was a problem.
+				if(allowMoreInput && shouldReadSource()) {
+					size_t readLen = readSource(buffer, sizeof(buffer), msTimeout);
+
+					if(readLen > 0) {
+						if(lines->AddData(buffer, readLen)) {
+							// The new data ended a line
+							lines->Next(line);
+							return true;
+						}
+						else {
+							// No line to return, but keep reader open
+							return false;
+						}
+					}
+					else {
+						// No data was read.
+						// Is there a problem, or do we just need to
+						// wait longer?
+						if(shouldReadSource())
+						{
+							// No data added, but keep reader open
+							return false;
+						}
+						else
+						{
+							// There shall be no further input.
+							// Close() closes the source, if open,
+							// flushes the LineBuffer, and disallows new
+							// input.
+							Close();
+
+							// The flush may have produced a line.
+							// If so, read it out and return true.
+							// Otherwise, no line, so return false.
+							// Either way, IsValid() will return false
+							// afterward.
+							return lines->Next(line);
+						}
+					}
+				}
+				else {
+					// Cannot buffer any new data.
 					return false;
 				}
-				else if(std::feof(file) || std::ferror(file)) {
-					close();
-					return false;
-				}
-				return true;
 			}
 
 		public:
-			_StdCFileLineReader(std::FILE * file) :
-				file(file),
-				lineStarted(false)
+			_StdCFileLineReader(Source * source) :
+				lines(Sextets::IO::LineBuffer::Create()),
+				allowMoreInput(true),
+				mutex(Sextets::Threads::MutexNames::Make("StdCFileLineReader", this)),
+				source(source)
 			{
 			}
 
-			~_StdCFileLineReader()
+			virtual ~_StdCFileLineReader()
 			{
-				close();
+				shutdown(true);
+				delete lines;
+			}
+
+			virtual bool ReadLine(RString& line, size_t msTimeout)
+			{
+				bool result;
+				lock();
+				result = nosyncReadLine(line, msTimeout);
+				unlock();
+				return result;
 			}
 
 			virtual bool IsValid()
 			{
-				return lineStarted || isUnderlyingStreamLive();
+				return lines->HasNext() || lines->HasPartialLine() ||
+					(allowMoreInput && shouldReadSource());
 			}
 
-			virtual bool ReadLine(RString& line, size_t ignored_msTimeout)
+			virtual void Close()
 			{
-				line = "";
-
-				if(!isUnderlyingStreamLive()) {
-					// If the stream is dead, but there is data left in the
-					// buffer, read it out here.
-					return flushLineTo(line);
-				}
-				else if(fgets(buffer, BUFFER_SIZE, file) != NULL) {
-					lineBuffer += buffer;
-					lineStarted = true;
-
-					if(chomp(lineBuffer)) {
-						// A line ending was stripped, so the line has
-						// finished being read.
-						flushLineTo(line);
-						return true;
-					}
-				}
-
-				// If only a partial line was read, we return false here
-				// just to give the caller some chance of terminating a loop
-				// based on a flag. IsValid() will (probably) remain true,
-				// telling the caller to try again.
-				return false;
+				shutdown();
 			}
 	};
 }
