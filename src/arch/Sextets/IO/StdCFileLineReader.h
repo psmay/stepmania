@@ -25,6 +25,15 @@ namespace Sextets
 				// NULL, no object is created and NULL is returned.
 				static StdCFileLineReader * Create(const RString& filename);
 		};
+
+		class StdCFileLineReaderFactory : public LineReaderFactory
+		{
+			private:
+				const RString filename;
+
+			public:
+				StdCFileLineReaderFactory(const RString& filename);
+		};
 	}
 }
 

@@ -57,6 +57,15 @@ namespace Sextets
 				// may also delay doing this until the destructor.)
 				virtual bool IsValid() = 0;
 		};
+
+		class LineReaderFactory
+		{
+			public:
+				LineReaderFactory() {}
+				virtual ~LineReaderFactory() {}
+				virtual bool IsValid() = 0;
+				virtual LineReader * Create() = 0;
+		};
 	}
 }
 

@@ -16,6 +16,16 @@ namespace Sextets
 			public:
 				static EzSocketsLineReader * Create(const RString& host, unsigned short port);
 		};
+
+		class EzSocketsLineReaderFactory : public LineReaderFactory
+		{
+			private:
+				const RString host;
+				const unsigned short port;
+
+			public:
+				EzSocketsLineReaderFactory(const RString& host, unsigned short port);
+		};
 	}
 }
 
