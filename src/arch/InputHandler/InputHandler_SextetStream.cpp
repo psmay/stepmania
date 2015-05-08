@@ -8,6 +8,11 @@
 #include "arch/Sextets/IO/StdCFileLineReader.h"
 #include "arch/Sextets/Threads/SingleReadPointerVariable.h"
 
+#if !defined(WITHOUT_NETWORKING)
+#include "ezsockets.h"
+#include "arch/Sextets/IO/EzSocketsLineReader.h"
+#endif // !defined(WITHOUT_NETWORKING)
+
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -219,6 +224,7 @@ InputHandler_SextetStream::~InputHandler_SextetStream()
 	}
 }
 
+
 // SextetStreamFromFile
 
 REGISTER_INPUT_HANDLER_CLASS (SextetStreamFromFile);
@@ -228,14 +234,7 @@ REGISTER_INPUT_HANDLER_CLASS (SextetStreamFromFile);
 #else
 	#define DEFAULT_INPUT_FILENAME "Data/StepMania-Input-SextetStream.in"
 #endif
-static Preference<RString> g_sSextetStreamInputFilename("SextetStreamInputFilename", DEFAULT_INPUT_FILENAME);
-
-
-InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(FILE * file)
-{
-	_impl = new InputHandler_SextetStreamFromFile::_Impl(this,
-		StdCFileLineReader::Create(file));
-}
+static Preference<RString> sextetStreamInputFilename("SextetStreamInputFilename", DEFAULT_INPUT_FILENAME);
 
 InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(const RString& filename)
 {
@@ -246,8 +245,34 @@ InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile(const RStri
 InputHandler_SextetStreamFromFile::InputHandler_SextetStreamFromFile()
 {
 	_impl = new InputHandler_SextetStreamFromFile::_Impl(this,
-		StdCFileLineReader::Create(g_sSextetStreamInputFilename));
+		StdCFileLineReader::Create(sextetStreamInputFilename));
 }
+
+#if !defined(WITHOUT_NETWORKING)
+// SextetStreamFromSocket
+
+#define DEFAULT_HOST "localhost"
+#define DEFAULT_PORT 5734
+
+REGISTER_INPUT_HANDLER_CLASS (SextetStreamFromSocket);
+
+static Preference<RString> sextetStreamInputSocketHost("SextetStreamInputSocketHost", DEFAULT_HOST);
+static Preference<int> sextetStreamInputSocketPort("SextetStreamInputSocketPort", DEFAULT_PORT);
+
+InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket(const RString& host, unsigned short port)
+{
+	_impl = new InputHandler_SextetStreamFromSocket::_Impl(this,
+		EzSocketsLineReader::Create(host, port));
+}
+
+InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket()
+{
+	_impl = new InputHandler_SextetStreamFromSocket::_Impl(this,
+		EzSocketsLineReader::Create(
+			sextetStreamInputSocketHost,
+			(unsigned short)sextetStreamInputSocketPort));
+}
+#endif // !defined(WITHOUT_NETWORKING)
 
 /*
  * Copyright © 2014-2015 Peter S. May

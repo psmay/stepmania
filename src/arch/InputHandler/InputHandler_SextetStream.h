@@ -37,10 +37,13 @@ class InputHandler_SextetStreamFromFile: public InputHandler_SextetStream
 		// determined how to disable buffering on an input file.) 
 		InputHandler_SextetStreamFromFile();
 		InputHandler_SextetStreamFromFile(const RString& filename);
+};
 
-		// The file object passed here must already be open and buffering should
-		// be disabled. The file object will be closed in the destructor.
-		InputHandler_SextetStreamFromFile(std::FILE * file);
+class InputHandler_SextetStreamFromSocket: public InputHandler_SextetStream
+{
+	public:
+		InputHandler_SextetStreamFromSocket();
+		InputHandler_SextetStreamFromSocket(const RString& host, unsigned short port);
 };
 
 #endif

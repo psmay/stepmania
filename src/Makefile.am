@@ -228,6 +228,9 @@ Sextets = arch/Sextets/IO/LineReader.h \
 	arch/Sextets/Threads/InterlockedPointerVariable.cpp arch/Sextets/Threads/InterlockedPointerVariable.h \
 	arch/Sextets/Threads/SingleReadPointerVariable.h
 
+if !WITHOUT_NETWORKING
+ Sextets += arch/Sextets/IO/EzSocketsLineReader.cpp arch/Sextets/IO/EzSocketsLineReader.h
+endif
 
 MemoryCard = arch/MemoryCard/MemoryCardDriver.cpp arch/MemoryCard/MemoryCardDriver.h
 
