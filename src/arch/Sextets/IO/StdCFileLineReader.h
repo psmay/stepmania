@@ -10,19 +10,28 @@ namespace Sextets
 {
 	namespace IO
 	{
+		/** @brief A LineReader that receives data from a cstdio FILE stream. */
 		class StdCFileLineReader : public LineReader
 		{
 			public:
-				// A file passed here will be de-buffered
-				// (`setbuf(file,NULL)`). The file will be closed no later
-				// than the deletion of this object.
-				//
-				// If a null std::FILE* is passed, no object is created and
-				// NULL is returned.
+				/** @brief Creates a StdCFileLineReader that will read from
+				 * the given stream.
+				 *
+				 * A file passed here will be de-buffered
+				 * (`setbuf(file,NULL)`). The file will be closed no later
+				 * than the deletion of this object.
+				 *
+				 * If a null std::FILE* is passed, no object is created and
+				 * NULL is returned.
+				 */
 				static StdCFileLineReader * Create(std::FILE * file);
 
-				// If attempting to `fopen()` the given filename returns
-				// NULL, no object is created and NULL is returned.
+				/** @brief Creates a StdCFileLineReader that will open and
+				 * read the file with the specified path.
+				 *
+				 * If attempting to `fopen()` the given filename returns
+				 * NULL, no object is created and NULL is returned.
+				 */
 				static StdCFileLineReader * Create(const RString& filename);
 		};
 
@@ -40,3 +49,4 @@ namespace Sextets
 }
 
 #endif
+//KWH

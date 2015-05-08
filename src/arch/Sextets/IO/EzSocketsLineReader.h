@@ -11,9 +11,14 @@ namespace Sextets
 {
 	namespace IO
 	{
+		/** @brief A LineReader that receives data from an EzSockets object.
+		 */
 		class EzSocketsLineReader : public LineReader
 		{
 			public:
+				/** @brief Creates an EzSocketsLineReader that will connect
+				 * to the given host and port.
+				 */
 				static EzSocketsLineReader * Create(const RString& host, unsigned short port);
 		};
 
@@ -34,3 +39,4 @@ namespace Sextets
 #endif // !defined(WITHOUT_NETWORKING)
 
 #endif
+//KWH
