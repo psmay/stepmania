@@ -1,130 +1,139 @@
 
-#include "arch/Sextets/IO/EzSocketsLineReader.h"
-#include "RageLog.h"
+#include "global.h"
 
 #if !defined(WITHOUT_NETWORKING)
+
+#include "arch/Sextets/IO/EzSocketsLineReader.h"
+#include "arch/Sextets/IO/LineBuffer.h"
+#include "arch/Sextets/Threads/MutexNames.h"
+#include "RageLog.h"
+#include "RageThreads.h"
+#include "ezsockets.h"
 
 namespace
 {
 	class _EzSocketsLineReader: public Sextets::IO::EzSocketsLineReader
 	{
 		private:
-			std::FILE * file;
+			// Note: After its initialization to true, keepRunning may only
+			// be set to false.
+			volatile bool keepRunning;
+
+			EzSockets * volatile sock;
+			Sextets::IO::LineBuffer * lines;
 
 			static const size_t BUFFER_SIZE = 16;
 			char buffer[BUFFER_SIZE];
-			RString lineBuffer;
-			bool lineStarted;
 
-			void close()
-			{
-				if(file != NULL) {
-					std::fclose(file);
-					file = NULL;
-				}
+			RageMutex mutex;
+
+			inline void lock() { mutex.Lock(); }
+			inline void unlock() { mutex.Unlock(); }
+
+			inline bool socketIsConnected() {
+				return (sock != NULL) && (sock->state != EzSockets::skDISCONNECTED);
 			}
 
-			static const char CR = 0xD;
-			static const char LF = 0xA;
-
-			static inline bool isCrOrLf(char c)
+			inline void shutdown(bool fromDestructor = false)
 			{
-				return (c == CR) || (c == LF);
-			}
+				// Cue ReadLine to stop looping
+				keepRunning = false;
 
-			static bool chomp(RString& line)
-			{
-				size_t len = line.length();
-				size_t lineEndingLength = 0;
+				// Wait for loop to stop before continuing
+				lock();
+				if(sock != NULL) {
+					if(socketIsConnected()) {
+						sock->close();
+					}
+					delete sock;
+					sock = NULL;
 
-				if((len >= 2) && (line[len - 2] == CR) && (line[len - 1] == LF)) {
-					lineEndingLength = 2;
-				}
-				else if(len >= 1)
-				{
-					if(isCrOrLf(line[len - 1])) {
-						lineEndingLength = 1;
+					// If the shutdown is from the destructor, don't bother
+					// making the remaining buffer data available as lines.
+					if(!fromDestructor) {
+						lines->Flush();
 					}
 				}
-
-				if(lineEndingLength > 0) {
-					line.resize(len - lineEndingLength);
-					return true;
-				}
-				else {
-					return false;
-				}
+				unlock();
 			}
 
-			bool flushLineTo(RString& dest)
+			// Called from the loop if no data or zero-length data was
+			// returned from the most recent read.
+			inline bool shouldReadAgain()
 			{
-				if(lineStarted) {
-					dest = lineBuffer;
-					lineBuffer = "";
-					lineStarted = false;
-					return true;
-				}
-				else {
-					return false;
-				}
+				return socketIsConnected() && !sock->IsError();
 			}
 
-
-			bool isUnderlyingStreamLive()
+			inline bool nosyncReadLine(RString& line, size_t msTimeout)
 			{
-				if(file == NULL) {
-					return false;
+				// Read out a buffered line first, if any
+				if(lines->Next(line)) {
+					return true;
 				}
-				else if(std::feof(file) || std::ferror(file)) {
-					close();
-					return false;
+
+				// Read data into line buffer until a line appears
+				{
+					size_t readLen;
+
+					while(keepRunning && socketIsConnected()) {
+						readLen = sock->DataAvailable(msTimeout) ?
+							sock->ReadData(buffer, sizeof(buffer)) : 0;
+
+						if(readLen > 0) {
+							if(lines->AddData(buffer, readLen)) {
+								// The new data ended a line
+								lines->Next(line);
+								return true;
+							}
+						}
+						else {
+							// No data was read.
+							// Is there a problem, or do we just need to
+							// wait longer?
+							if(!shouldReadAgain())
+							{
+								keepRunning = false;
+							}
+						}
+					}
+
+					// At this point, there shall be no further input.
+					// The socket may still be open, so we close it here.
+					shutdown();
+
+					// shutdown() flushes any remaining buffered data as a
+					// line. If such a line exists, we read it out here.
+					return lines->Next(line);
 				}
-				return true;
 			}
 
 		public:
-			_EzSocketsLineReader(std::FILE * file) :
-				file(file),
-				lineStarted(false)
+			_EzSocketsLineReader(EzSockets * sock) :
+				lines(Sextets::IO::LineBuffer::Create()),
+				keepRunning(true),
+				mutex(Sextets::Threads::MutexNames::Make("EzSocketsLineReader", this)),
+				sock(sock)
 			{
 			}
 
-			~_EzSocketsLineReader()
+			virtual ~_EzSocketsLineReader()
 			{
-				close();
+				shutdown(true);
+			}
+
+			virtual bool ReadLine(RString& line, size_t msTimeout)
+			{
+				bool result;
+				lock();
+				result = nosyncReadLine(line, msTimeout);
+				unlock();
+				return result;
 			}
 
 			virtual bool IsValid()
 			{
-				return lineStarted || isUnderlyingStreamLive();
-			}
-
-			virtual bool ReadLine(RString& line, size_t ignored_msTimeout)
-			{
-				line = "";
-
-				if(!isUnderlyingStreamLive()) {
-					// If the stream is dead, but there is data left in the
-					// buffer, read it out here.
-					return flushLineTo(line);
-				}
-				else if(fgets(buffer, BUFFER_SIZE, file) != NULL) {
-					lineBuffer += buffer;
-					lineStarted = true;
-
-					if(chomp(lineBuffer)) {
-						// A line ending was stripped, so the line has
-						// finished being read.
-						flushLineTo(line);
-						return true;
-					}
-				}
-
-				// If only a partial line was read, we return false here
-				// just to give the caller some chance of terminating a loop
-				// based on a flag. IsValid() will (probably) remain true,
-				// telling the caller to try again.
-				return false;
+				return lines->HasNext() || lines->HasPartialLine() ||
+					(keepRunning && socketIsConnected());
 			}
 	};
 }
@@ -133,21 +142,21 @@ namespace Sextets
 {
 	namespace IO
 	{
-		EzSocketsLineReader * EzSocketsLineReader::Create(std::FILE * file)
+		EzSocketsLineReader * EzSocketsLineReader::Create(const RString& host, unsigned short port)
 		{
-			if(file == NULL) {
-				LOG->Info("Could not start EzSocketsLineReader (file pointer was NULL)");
+			EzSockets * sock = new EzSockets;
+
+			sock->close();
+			sock->create();
+			sock->blocking = false;
+
+			if(!sock->connect(host, port)) {
+				LOG->Warn("Could not connect to %s:%u for input", host.c_str(), (unsigned int)port);
+				delete sock;
 				return NULL;
 			}
 
-			LOG->Info("Starting EzSocketsLineReader from open std::FILE");
-			std::setbuf(file, NULL);
-			return new _EzSocketsLineReader(file);
-		}
-
-		EzSocketsLineReader * EzSocketsLineReader::Create(const RString& filename)
-		{
-			return Create(std::fopen(filename.c_str(), "rb"));
+			return new _EzSocketsLineReader(sock);
 		}
 	}
 }

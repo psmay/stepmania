@@ -1,24 +1,10 @@
 
 #include "arch/Sextets/Threads/InterlockedPointerVariable.h"
+#include "arch/Sextets/Threads/MutexNames.h"
 
 #include "RageThreads.h"
 
 #include <sstream>
-
-namespace
-{
-	RString makeMutexName(const RString& ns, const RString& name, void * topic)
-	{
-		std::stringstream ss;
-		ss << ns << "::" << name << "(" << topic << ")";
-		return RString(ss.str());
-	}
-
-	RString makeMutexName(const RString& name, void * topic)
-	{
-		return makeMutexName("Sextets::Threads", name, topic);
-	}
-}
 
 namespace Sextets
 {
@@ -63,7 +49,7 @@ namespace Sextets
 			public:
 				_Impl(void * initialValue) :
 					value(initialValue),
-					mutex(makeMutexName("_InterlockedUntypedPointerVariable::_Impl", this))
+					mutex(MutexNames::Make("_InterlockedUntypedPointerVariable::_Impl", this))
 				{
 				}
 

@@ -26,6 +26,7 @@ namespace Sextets
 				static StdCFileLineReader * Create(const RString& filename);
 		};
 
+		/*
 		class StdCFileLineReaderFactory : public LineReaderFactory
 		{
 			private:
@@ -34,6 +35,7 @@ namespace Sextets
 			public:
 				StdCFileLineReaderFactory(const RString& filename);
 		};
+		*/
 	}
 }
 

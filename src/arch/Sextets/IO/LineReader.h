@@ -58,6 +58,7 @@ namespace Sextets
 				virtual bool IsValid() = 0;
 		};
 
+		/*
 		class LineReaderFactory
 		{
 			public:
@@ -66,6 +67,7 @@ namespace Sextets
 				virtual bool IsValid() = 0;
 				virtual LineReader * Create() = 0;
 		};
+		*/
 	}
 }
 

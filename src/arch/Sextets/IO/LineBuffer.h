@@ -30,6 +30,10 @@ namespace Sextets
 				// line, and clears the buffer.
 				virtual void Flush() = 0;
 
+				// Returns true if calling Flush() would cause a line to be
+				// available from Next().
+				virtual bool HasPartialLine() = 0;
+
 				// Returns true if there is at least one line available to
 				// be retrieved using Next().
 				virtual bool HasNext() = 0;

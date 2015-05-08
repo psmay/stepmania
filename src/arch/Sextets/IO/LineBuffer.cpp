@@ -169,6 +169,10 @@ namespace
 				flush();
 			}
 
+			bool HasPartialLine() {
+				return partialLine != NULL;
+			}
+
 			bool HasNext() {
 				return !lines.empty();
 			}

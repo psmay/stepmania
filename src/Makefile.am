@@ -225,6 +225,7 @@ Lights = arch/Lights/LightsDriver.cpp arch/Lights/LightsDriver.h
 Sextets = arch/Sextets/IO/LineReader.h \
 	arch/Sextets/IO/LineBuffer.cpp arch/Sextets/IO/LineBuffer.h \
 	arch/Sextets/IO/StdCFileLineReader.cpp arch/Sextets/IO/StdCFileLineReader.h \
+	arch/Sextets/Threads/MutexNames.cpp arch/Sextets/Threads/MutexNames.h \
 	arch/Sextets/Threads/InterlockedPointerVariable.cpp arch/Sextets/Threads/InterlockedPointerVariable.h \
 	arch/Sextets/Threads/SingleReadPointerVariable.h
 

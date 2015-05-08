@@ -17,6 +17,7 @@ namespace Sextets
 				static EzSocketsLineReader * Create(const RString& host, unsigned short port);
 		};
 
+		/*
 		class EzSocketsLineReaderFactory : public LineReaderFactory
 		{
 			private:
@@ -26,6 +27,7 @@ namespace Sextets
 			public:
 				EzSocketsLineReaderFactory(const RString& host, unsigned short port);
 		};
+		*/
 	}
 }
 
