@@ -5,6 +5,9 @@
 #include "RageThreads.h"
 #include "RageUtil.h"
 
+#include "SextetStream/IO/LineReader.h"
+#include "SextetStream/IO/StdCFileLineReader.h"
+
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -29,54 +32,6 @@ using namespace std;
 #define DEFAULT_TIMEOUT_MS 1000
 #define STATE_BUFFER_SIZE NUMBER_OF_SEXTETS_FOR_BIT_COUNT(BUTTON_COUNT)
 
-namespace
-{
-	class LineReader
-	{
-		protected:
-			int timeout_ms;
-
-		public:
-			LineReader()
-			{
-				timeout_ms = DEFAULT_TIMEOUT_MS;
-			}
-
-			virtual ~LineReader()
-			{
-			}
-
-			virtual bool IsValid()
-			{
-				return false;
-			}
-
-			// Ideally, this method should return if timeout_ms passes
-			// before a line becomes available. Actually doing this may
-			// require some platform-specific non-blocking read capability.
-			// This sort of thing could be implemented using e.g. POSIX
-			// select() and Windows GetOverlappedResultEx(), both of which
-			// have timeout parameters. (I get the sense that the
-			// RageFileDriverTimeout class could be convinced to work, but
-			// there isn't a lot of code using it, so I'm lacking the proper
-			// examples.)
-			//
-			// If this method does block, almost everything will still work,
-			// but the blocking may prevent the loop from checking
-			// continueInputThread in a timely fashion. If the stream ceases
-			// to produce new data before this object is destroyed, the
-			// current thread will hang until the other side of the
-			// connection closes the stream (or produces a line of data). A
-			// workaround for that would be to have the far side of the
-			// connection repeat its last line every second or so as a
-			// keepalive.
-			//
-			// false (line undefined) if there is an error or EOF condition,
-			// true (line = next line from stream) if a whole line is available,
-			// true (line = "") if no error but still waiting for next line.
-			virtual bool ReadLine(RString& line) = 0;
-	};
-}
 
 class InputHandler_SextetStream::Impl
 {
@@ -98,7 +53,7 @@ class InputHandler_SextetStream::Impl
 		// object. getLineReader() calls this; if the returned object claims
 		// it is valid, it is returned. Otherwise, it is destroyed and NULL
 		// is returned.
-		virtual LineReader * getUnvalidatedLineReader() = 0;
+		virtual SextetStream::IO::LineReader * getUnvalidatedLineReader() = 0;
 
 		inline void clearStateBuffer()
 		{
@@ -112,11 +67,11 @@ class InputHandler_SextetStream::Impl
 			inputThread.Create(StartInputThread, this);
 		}
 
-		LineReader * getLineReader()
+		SextetStream::IO::LineReader * getLineReader()
 		{
-			LineReader * linereader = getUnvalidatedLineReader();
+			SextetStream::IO::LineReader * linereader = getUnvalidatedLineReader();
 			if(linereader != NULL) {
-				if(!linereader->IsValid()) {
+				if(!linereader->IsReady()) {
 					delete linereader;
 					linereader = NULL;
 				}
@@ -225,7 +180,7 @@ class InputHandler_SextetStream::Impl
 		void RunInputThread()
 		{
 			RString line;
-			LineReader * linereader;
+			SextetStream::IO::LineReader * linereader;
 
 			LOG->Trace("Input thread started; getting line reader");
 			linereader = getLineReader();
@@ -289,74 +244,6 @@ static Preference<RString> g_sSextetStreamInputFilename("SextetStreamInputFilena
 
 namespace
 {
-	class StdCFileLineReader: public LineReader
-	{
-		private:
-			// The buffer size isn't critical; the RString will simply be
-			// extended until the line is done.
-			static const size_t BUFFER_SIZE = 64;
-			char buffer[BUFFER_SIZE];
-		protected:
-			std::FILE * file;
-
-		public:
-			StdCFileLineReader(std::FILE * file)
-			{
-				LOG->Info("Starting InputHandler_SextetStreamFromFile from open std::FILE");
-				this->file = file;
-			}
-
-			StdCFileLineReader(const RString& filename)
-			{
-				LOG->Info("Starting InputHandler_SextetStreamFromFile from std::FILE with filename '%s'",
-					filename.c_str());
-				file = std::fopen(filename.c_str(), "rb");
-
-				if(file == NULL) {
-					LOG->Warn("Error opening file '%s' for input (cstdio): %s", filename.c_str(),
-						std::strerror(errno));
-				}
-				else {
-					LOG->Info("File opened");
-					// Disable buffering on the file
-					std::setbuf(file, NULL);
-				}
-			}
-
-			~StdCFileLineReader()
-			{
-				if(file != NULL) {
-					std::fclose(file);
-				}
-			}
-
-			virtual bool IsValid()
-			{
-				return file != NULL;
-			}
-
-			virtual bool ReadLine(RString& line)
-			{
-				bool afterFirst = false;
-				size_t len;
-
-				line = "";
-
-				if(file != NULL) {
-					while(fgets(buffer, BUFFER_SIZE, file) != NULL) {
-						afterFirst = true;
-						line += buffer;
-						len = line.length();
-						if(len > 0 && line[len - 1] == 0xA) {
-							break;
-						}
-					}
-				}
-
-				return afterFirst;
-			}
-	};
-
 	class StdCFileHandleImpl: public InputHandler_SextetStream::Impl
 	{
 		protected:
@@ -369,9 +256,9 @@ namespace
 				this->file = file;
 			}
 
-			virtual LineReader * getUnvalidatedLineReader()
+			virtual SextetStream::IO::LineReader * getUnvalidatedLineReader()
 			{
-				return new StdCFileLineReader(this->file);
+				return SextetStream::IO::StdCFileLineReader::Create(this->file);
 			}
 
 			virtual ~StdCFileHandleImpl()
@@ -392,9 +279,9 @@ namespace
 				this->filename = filename;
 			}
 
-			virtual LineReader * getUnvalidatedLineReader()
+			virtual SextetStream::IO::LineReader * getUnvalidatedLineReader()
 			{
-				return new StdCFileLineReader(filename);
+				return SextetStream::IO::StdCFileLineReader::Create(filename);
 			}
 
 			virtual ~StdCFileNameImpl()
