@@ -1,15 +1,15 @@
 
-#include "SextetStream/IO/StdCFileLineReader.h"
+#include "SextetStream/IO/StdCFilePacketReader.h"
 #include "RageLog.h"
 #include <cerrno>
 
 namespace
 {
-	class Impl: public SextetStream::IO::StdCFileLineReader
+	class Impl: public SextetStream::IO::StdCFilePacketReader
 	{
 		private:
 			// The buffer size isn't critical; the RString will simply be
-			// extended until the line is done.
+			// extended until the packet is done.
 			static const size_t BUFFER_SIZE = 64;
 			char buffer[BUFFER_SIZE];
 		protected:
@@ -51,19 +51,19 @@ namespace
 				return file != NULL;
 			}
 
-			virtual bool ReadLine(RString& line)
+			virtual bool ReadPacket(RString& packet)
 			{
 				bool afterFirst = false;
 				size_t len;
 
-				line = "";
+				packet = "";
 
 				if(file != NULL) {
 					while(fgets(buffer, BUFFER_SIZE, file) != NULL) {
 						afterFirst = true;
-						line += buffer;
-						len = line.length();
-						if(len > 0 && line[len - 1] == 0xA) {
+						packet += buffer;
+						len = packet.length();
+						if(len > 0 && packet[len - 1] == 0xA) {
 							break;
 						}
 					}
@@ -78,15 +78,17 @@ namespace SextetStream
 {
 	namespace IO
 	{
-		StdCFileLineReader* StdCFileLineReader::Create(std::FILE * file)
+		StdCFilePacketReader* StdCFilePacketReader::Create(std::FILE * file)
 		{
 			return new Impl(file);
 		}
 
-		StdCFileLineReader* StdCFileLineReader::Create(const RString& filename)
+		StdCFilePacketReader* StdCFilePacketReader::Create(const RString& filename)
 		{
 			return new Impl(filename);
 		}
+		
+		StdCFilePacketReader::~StdCFilePacketReader() {}
 	}
 }
 

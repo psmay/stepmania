@@ -1,19 +1,20 @@
-#ifndef SEXTETSTREAM_IO_STDCFILELINEREADER
-#define SEXTETSTREAM_IO_STDCFILELINEREADER
+#ifndef SEXTETSTREAM_IO_STDCFILEPACKETREADER
+#define SEXTETSTREAM_IO_STDCFILEPACKETREADER
 
-#include "SextetStream/IO/LineReader.h"
+#include "SextetStream/IO/PacketReader.h"
 #include <cstdio>
 
 namespace SextetStream
 {
 	namespace IO
 	{
-		// LineReader implementation using std::FILE from <cstdio>
-		class StdCFileLineReader : public LineReader
+		// PacketReader implementation using std::FILE from <cstdio>
+		class StdCFilePacketReader : public PacketReader
 		{
 			public:
-				static StdCFileLineReader* Create(std::FILE * file);
-				static StdCFileLineReader* Create(const RString& filename);
+				virtual ~StdCFilePacketReader();
+				static StdCFilePacketReader* Create(std::FILE * file);
+				static StdCFilePacketReader* Create(const RString& filename);
 		};
 	}
 }

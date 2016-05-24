@@ -1,5 +1,5 @@
-#ifndef SEXTETSTREAM_IO_LINEREADER
-#define SEXTETSTREAM_IO_LINEREADER
+#ifndef SEXTETSTREAM_IO_PACKETREADER
+#define SEXTETSTREAM_IO_PACKETREADER
 
 #include "global.h"
 
@@ -7,32 +7,34 @@ namespace SextetStream
 {
 	namespace IO
 	{
-		// Interface for classes that implement the LineReader protocol for
-		// SextetStream. This protocol is not for use with plain text in
-		// general since blank lines have an application-specific meaning.
-		class LineReader
+		// Interface for classes that implement the PacketReader protocol
+		// for SextetStream.
+		class PacketReader
 		{
 			public:
+				virtual ~PacketReader() {}
+
 				// Returns true if this stream is currently in such a state
-				// that ReadLine() will return a valid response. A false
+				// that ReadPacket() will return a valid response. A false
 				// value may indicate that an underlying stream is closed or
 				// has encountered an unrecoverable error condition. Do not
-				// call ReadLine() unless this returns true. Once false has
-				// been returned, this method will not return true for the
-				// same object.
+				// call ReadPacket() unless this returns true. Once false
+				// has been returned, this method will not return true for
+				// the same object.
 				virtual bool IsReady() = 0;
 
-				// Retrieves the next line available from the stream.
+				// Retrieves the next packet available from the stream.
 				//
-				// Returns true with line set to a non-empty string if a
-				// whole line is immediately available for read.
+				// Returns true with packet set to a non-empty string if a
+				// whole packet is immediately available for read.
 				//
-				// Returns false with line undefined if the stream can no
+				// Returns false with packet undefined if the stream can no
 				// longer be read due to EOF or an unrecoverable error
 				// condition.
 				//
-				// Returns true with line set to "" if the stream is open
-				// but a non-blocking read has not read an entire line yet.
+				// Returns true with packet set to "" if the stream is open
+				// but a non-blocking read has not read an entire packet
+				// yet.
 				//
 				// Whenever possible, this should be implemented on a
 				// non-blocking read. If this method blocks, the loop that
@@ -45,7 +47,7 @@ namespace SextetStream
 				// often. Closing the far side of the connection will also
 				// end the blocking, but this is only really useful while
 				// closing.
-				virtual bool ReadLine(RString& line) = 0;
+				virtual bool ReadPacket(RString& packet) = 0;
 		};
 	}
 }
