@@ -23,25 +23,23 @@ public:
 	LightsDriver_SextetStream();
 	virtual ~LightsDriver_SextetStream();
 	virtual void Set(const LightsState *ls);
+
+public:
+	class Impl;
 protected:
-	void * _impl;
+	Impl * _impl;
 };
 
 class LightsDriver_SextetStreamToFile : public LightsDriver_SextetStream
 {
 public:
 	LightsDriver_SextetStreamToFile();
-	LightsDriver_SextetStreamToFile(const RString& filename);
-
-	// The file object passed here should already be open, and will be
-	// flushed, closed, and deleted in the destructor.
-	LightsDriver_SextetStreamToFile(RageFile * file);
 };
 
 #endif
 
 /*
- * Copyright © 2014 Peter S. May
+ * Copyright © 2014-2016 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the

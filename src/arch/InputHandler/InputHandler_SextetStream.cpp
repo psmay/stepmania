@@ -137,6 +137,7 @@ public:
 //
 InputHandler_SextetStream::InputHandler_SextetStream()
 {
+	_impl = NULL;
 }
 
 InputHandler_SextetStream::~InputHandler_SextetStream()

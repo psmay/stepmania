@@ -5,6 +5,7 @@
 #include "RageUtil.h"
 
 #include <cstring>
+#include <string>
 
 using namespace std;
 
@@ -14,6 +15,171 @@ static const size_t CONTROLLER_SEXTET_COUNT = 6;
 
 // Number of bytes to contain the full pack and a trailing LF
 static const size_t FULL_SEXTET_COUNT = CABINET_SEXTET_COUNT + (NUM_GameController * CONTROLLER_SEXTET_COUNT) + 1;
+
+
+// SextetStream/IO/PacketWriter.h
+namespace SextetStream
+{
+	namespace IO
+	{
+		class PacketWriter
+		{
+		public:
+			PacketWriter()
+			{
+			}
+			virtual ~PacketWriter()
+			{
+			}
+
+			// Returns whether this stream can currently write.
+			virtual bool IsReady() = 0;
+
+			// Writes the provided packet (and generally also an LF or CRLF,
+			// depending on the intended receiver) to this packet writer.
+			virtual bool WritePacket(const RString& packet) = 0;
+		};
+	}
+}
+
+// SextetStream/IO/NoopPacketWriter.h
+namespace SextetStream
+{
+	namespace IO
+	{
+		class NoopPacketWriter : public PacketWriter
+		{
+		public:
+			NoopPacketWriter();
+			virtual ~NoopPacketWriter();
+			virtual bool IsReady();
+			virtual bool WritePacket(const RString& packet);
+		};
+	}
+}
+
+// SextetStream/IO/NoopPacketWriter.cpp
+namespace SextetStream
+{
+	namespace IO
+	{
+		NoopPacketWriter::NoopPacketWriter()
+		{
+			LOG->Info("NoopPacketWriter ctor");
+			LOG->Flush();
+		}
+		NoopPacketWriter::~NoopPacketWriter()
+		{
+			LOG->Info("NoopPacketWriter dtor");
+			LOG->Flush();
+		}
+		bool NoopPacketWriter::IsReady()
+		{
+			return false;
+		}
+		bool NoopPacketWriter::WritePacket(const RString& packet)
+		{
+			return false;
+		}
+	}
+}
+
+
+// SextetStream/IO/RageFilePacketWriter.h
+namespace SextetStream
+{
+	namespace IO
+	{
+		class RageFilePacketWriter : public PacketWriter
+		{
+		public:
+			virtual ~RageFilePacketWriter();
+
+			// Note: If there is a problem opening the file, returns
+			// NULL.
+			static RageFilePacketWriter * Create(const RString& filename);
+
+			// Note: If `stream` is `NULL`, returns `NULL`.
+			// When using this method, the RageFile should have been
+			// opened with the modes
+			// `RageFile::WRITE|RageFile::STREAMED` set. (This is not
+			// checked.) Additionally, the provided RageFile will be
+			// properly closed, flushed, and deleted when this packet
+			// writer is deleted.
+			static RageFilePacketWriter * Create(RageFile * stream);
+		};
+	}
+}
+
+// SextetStream/IO/RageFilePacketWriter.cpp
+namespace
+{
+	class PwImpl : public SextetStream::IO::RageFilePacketWriter
+	{
+	private:
+		RageFile * out;
+
+	public:
+		PwImpl(RageFile * stream)
+		{
+			LOG->Info("RageFilePacketWriter impl ctor");
+			out = stream;
+		}
+
+		~PwImpl()
+		{
+			LOG->Info("RageFilePacketWriter impl dtor");
+			if(out != NULL) {
+				out->Flush();
+				out->Close();
+				SAFE_DELETE(out);
+			}
+		}
+
+		bool IsReady()
+		{
+			return out != NULL;
+		}
+
+		bool WritePacket(const RString& packet)
+		{
+			LOG->Info("RageFilePacketWriter impl WritePacket");
+			if(out != NULL) {
+				out->Write(packet.c_str(), packet.length());
+				out->Write("\x0A", 1);
+				out->Flush();
+			}
+		}
+	};
+}
+namespace SextetStream
+{
+	namespace IO
+	{
+		RageFilePacketWriter* RageFilePacketWriter::Create(const RString& filename)
+		{
+			RageFile * file = new RageFile;
+
+			if(!file->Open(filename, RageFile::WRITE|RageFile::STREAMED)) {
+				LOG->Warn("Error opening file '%s' for output: %s", filename.c_str(), file->GetError().c_str());
+				SAFE_DELETE(file);
+				return NULL;
+			}
+
+			return RageFilePacketWriter::Create(file);
+		}
+
+		RageFilePacketWriter* RageFilePacketWriter::Create(RageFile * stream)
+		{
+			if(stream == NULL) {
+				return NULL;
+			}
+			return new PwImpl(stream);
+		}
+
+		RageFilePacketWriter::~RageFilePacketWriter() {}
+	}
+}
 
 
 // Serialization routines
@@ -43,12 +209,12 @@ inline uint8_t printableSextet(uint8_t data)
 inline uint8_t packPlainSextet(bool b0, bool b1, bool b2, bool b3, bool b4, bool b5)
 {
 	return (uint8_t)(
-		(b0 ? 0x01 : 0) |
-		(b1 ? 0x02 : 0) |
-		(b2 ? 0x04 : 0) |
-		(b3 ? 0x08 : 0) |
-		(b4 ? 0x10 : 0) |
-		(b5 ? 0x20 : 0));
+			   (b0 ? 0x01 : 0) |
+			   (b1 ? 0x02 : 0) |
+			   (b2 ? 0x04 : 0) |
+			   (b3 ? 0x08 : 0) |
+			   (b4 ? 0x10 : 0) |
+			   (b5 ? 0x20 : 0));
 }
 
 // Packs 6 booleans into a printable sextet
@@ -61,12 +227,12 @@ inline uint8_t packPrintableSextet(bool b0, bool b1, bool b2, bool b3, bool b4, 
 inline size_t packCabinetLights(const LightsState *ls, uint8_t* buffer)
 {
 	buffer[0] = packPrintableSextet(
-		ls->m_bCabinetLights[LIGHT_MARQUEE_UP_LEFT],
-		ls->m_bCabinetLights[LIGHT_MARQUEE_UP_RIGHT],
-		ls->m_bCabinetLights[LIGHT_MARQUEE_LR_LEFT],
-		ls->m_bCabinetLights[LIGHT_MARQUEE_LR_RIGHT],
-		ls->m_bCabinetLights[LIGHT_BASS_LEFT],
-		ls->m_bCabinetLights[LIGHT_BASS_RIGHT]);
+					ls->m_bCabinetLights[LIGHT_MARQUEE_UP_LEFT],
+					ls->m_bCabinetLights[LIGHT_MARQUEE_UP_RIGHT],
+					ls->m_bCabinetLights[LIGHT_MARQUEE_LR_LEFT],
+					ls->m_bCabinetLights[LIGHT_MARQUEE_LR_RIGHT],
+					ls->m_bCabinetLights[LIGHT_BASS_LEFT],
+					ls->m_bCabinetLights[LIGHT_BASS_RIGHT]);
 	return CABINET_SEXTET_COUNT;
 }
 
@@ -76,63 +242,62 @@ inline size_t packControllerLights(const LightsState *ls, GameController gc, uin
 {
 	// Menu buttons
 	buffer[0] = packPrintableSextet(
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_MENULEFT],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_MENURIGHT],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_MENUUP],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_MENUDOWN],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_START],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_SELECT]);
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_MENULEFT],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_MENURIGHT],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_MENUUP],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_MENUDOWN],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_START],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_SELECT]);
 
 	// Other non-sensors
 	buffer[1] = packPrintableSextet(
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_BACK],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_COIN],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_OPERATOR],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_EFFECT_UP],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_EFFECT_DOWN],
-		false);
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_BACK],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_COIN],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_OPERATOR],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_EFFECT_UP],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_EFFECT_DOWN],
+					false);
 
 	// Sensors
 	buffer[2] = packPrintableSextet(
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_01],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_02],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_03],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_04],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_05],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_06]);
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_01],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_02],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_03],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_04],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_05],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_06]);
 	buffer[3] = packPrintableSextet(
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_07],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_08],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_09],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_10],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_11],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_12]);
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_07],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_08],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_09],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_10],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_11],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_12]);
 	buffer[4] = packPrintableSextet(
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_13],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_14],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_15],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_16],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_17],
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_18]);
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_13],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_14],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_15],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_16],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_17],
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_18]);
 	buffer[5] = packPrintableSextet(
-		ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_19],
-		false,
-		false,
-		false,
-		false,
-		false);
+					ls->m_bGameButtonLights[gc][GAME_BUTTON_CUSTOM_19],
+					false,
+					false,
+					false,
+					false,
+					false);
 
 	return CONTROLLER_SEXTET_COUNT;
 }
 
-inline size_t packLine(uint8_t * buffer, const LightsState* ls)
+inline size_t convertLightsToPacket(uint8_t * buffer, const LightsState* ls)
 {
 	size_t index = 0;
 
 	index += packCabinetLights(ls, &(buffer[index]));
 
-	FOREACH_ENUM(GameController, gc)
-	{
+	FOREACH_ENUM(GameController, gc) {
 		index += packControllerLights(ls, gc, &(buffer[index]));
 	}
 
@@ -142,86 +307,103 @@ inline size_t packLine(uint8_t * buffer, const LightsState* ls)
 	return index;
 }
 
-
-
-// Private members/methods are kept out of the header using an opaque pointer `_impl`.
-// Google "pimpl idiom" for an explanation of what's going on and why it is (or might be) useful.
-
-
-// Implementation class
-
-namespace
+inline void copyBytesToRString(RString& dest, const void * buffer, size_t sizeInBytes)
 {
-	class Impl
+	const char * charBuffer = (const char *) buffer;
+	dest = RString(charBuffer, sizeInBytes);
+}
+
+inline RString bytesToRString(const void * buffer, size_t sizeInBytes)
+{
+	RString str;
+	copyBytesToRString(str, buffer, sizeInBytes);
+	return str;
+}
+
+
+
+
+// Implementation base class
+
+class LightsDriver_SextetStream::Impl
+{
+
+private:
+	uint8_t lastWrittenOutput[FULL_SEXTET_COUNT];
+	SextetStream::IO::PacketWriter * writer;
+
+public:
+	Impl(SextetStream::IO::PacketWriter * writer)
 	{
-	protected:
-		uint8_t lastOutput[FULL_SEXTET_COUNT];
-		RageFile * out;
-
-	public:
-		Impl(RageFile * file) {
-			out = file;
-
-			// Ensure a non-match the first time
-			lastOutput[0] = 0;
+		if(writer == NULL) {
+			writer = new SextetStream::IO::NoopPacketWriter();
 		}
+		this->writer = writer;
 
-		virtual ~Impl() {
-			if(out != NULL)
-			{
-				out->Flush();
-				out->Close();
-				SAFE_DELETE(out);
-			}
+		// Clear the last output buffer
+		memset(lastWrittenOutput, 0, FULL_SEXTET_COUNT);
+	}
+
+	virtual ~Impl()
+	{
+		if(writer != NULL) {
+			delete writer;
+			writer = NULL;
+
+			LOG->Info("Deleted writer");
+			LOG->Flush();
 		}
+	}
 
-		void Set(const LightsState * ls)
-		{
+	void Set(const LightsState * ls)
+	{
+		// Skip writing if the writer is not available.
+		if(writer->IsReady()) {
 			uint8_t buffer[FULL_SEXTET_COUNT];
 
-			packLine(buffer, ls);
+			convertLightsToPacket(buffer, ls);
 
 			// Only write if the message has changed since the last write.
-			if(memcmp(buffer, lastOutput, FULL_SEXTET_COUNT) != 0)
-			{
-				if(out != NULL)
-				{
-					out->Write(buffer, FULL_SEXTET_COUNT);
-					out->Flush();
-				}
+			if(memcmp(buffer, lastWrittenOutput, FULL_SEXTET_COUNT) != 0) {
+				RString packet = bytesToRString(buffer, FULL_SEXTET_COUNT);
+
+				writer->WritePacket(packet);
+				LOG->Info("Packet: %s", packet.c_str());
 
 				// Remember last message
-				memcpy(lastOutput, buffer, FULL_SEXTET_COUNT);
+				memcpy(lastWrittenOutput, buffer, FULL_SEXTET_COUNT);
 			}
 		}
-	};
-}
+	}
+};
+
 
 
 // LightsDriver_SextetStream interface
 // (Wrapper for Impl)
 
-#define IMPL ((Impl*)_impl)
-
 LightsDriver_SextetStream::LightsDriver_SextetStream()
 {
+	LOG->Info("Starting a SextetStream lights driver");
 	_impl = NULL;
 }
 
 LightsDriver_SextetStream::~LightsDriver_SextetStream()
 {
-	if(IMPL != NULL)
-	{
-		delete IMPL;
+	LOG->Info("Destroying a SextetStream lights driver");
+	LOG->Flush();
+	if(_impl != NULL) {
+		LOG->Info("Deleting an implementation");
+		LOG->Flush();
+		delete _impl;
+		LOG->Info("Deleted implementation");
+		LOG->Flush();
 	}
 }
 
 void LightsDriver_SextetStream::Set(const LightsState *ls)
 {
-	if(IMPL != NULL)
-	{
-		IMPL->Set(ls);
-	}
+	_impl->Set(ls);
 }
 
 
@@ -236,37 +418,26 @@ REGISTER_LIGHTS_DRIVER_CLASS(SextetStreamToFile);
 #endif
 static Preference<RString> g_sSextetStreamOutputFilename("SextetStreamOutputFilename", DEFAULT_OUTPUT_FILENAME);
 
-inline RageFile * openOutputStream(const RString& filename)
-{
-	RageFile * file = new RageFile;
-
-	if(!file->Open(filename, RageFile::WRITE|RageFile::STREAMED))
-	{
-		LOG->Warn("Error opening file '%s' for output: %s", filename.c_str(), file->GetError().c_str());
-		SAFE_DELETE(file);
-		file = NULL;
-	}
-
-	return file;
-}
-
-LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(RageFile * file)
-{
-	_impl = new Impl(file);
-}
-
-LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile(const RString& filename)
-{
-	_impl = new Impl(openOutputStream(filename));
-}
-
 LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
 {
-	_impl = new Impl(openOutputStream(g_sSextetStreamOutputFilename));
+	LOG->Info("Creating LightsDriver_SextetStreamToFile");
+	LOG->Flush();
+
+	SextetStream::IO::PacketWriter * writer =
+		SextetStream::IO::RageFilePacketWriter::Create(g_sSextetStreamOutputFilename);
+
+	if(writer == NULL) {
+		LOG->Warn("Create of packet writer for LightsDriver_SextetStreamToFile failed.");
+	} else {
+		LOG->Info("Create of packet writer for LightsDriver_SextetStreamToFile OK.");
+	}
+
+	// Impl() accounts for the case where writer is NULL.
+	_impl = new Impl(writer);
 }
 
 /*
- * Copyright © 2014 Peter S. May
+ * Copyright © 2014-2016 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
