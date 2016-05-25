@@ -5,7 +5,7 @@ Explanation
 -----------
 
 This is a set of drivers (currently, just one driver) that accept button
-inputs encoded in a stream of character. By accepting this data from a
+inputs encoded in a stream of characters. By accepting this data from a
 stream, input can be produced by a separate program. Such a program can
 be implemented using any language/platform that supports reading from
 the desired input device (and writing to an output stream). If C++ isn't

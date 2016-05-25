@@ -1,5 +1,6 @@
 
 #include "SextetStream/Data.h"
+#include "RageLog.h"
 
 namespace SextetStream
 {
@@ -15,8 +16,24 @@ namespace SextetStream
 			return value & 0x3F;
 		}
 
-		bool ConvertPacketToState(uint8_t * buffer, size_t bufferSize, const RString& packet)
+		RString TrimTrailingNewlines(const RString& str0)
 		{
+			RString str = str0;
+
+			size_t found = str.find_last_not_of("\x0A\x0D");
+			if(found != RString::npos) {
+				str.erase(found + 1);
+			} else {
+				str.clear();
+			}
+
+			return str;
+		}
+
+		bool ConvertPacketToState(uint8_t * buffer, size_t bufferSize, const RString& packet0)
+		{
+			RString packet = TrimTrailingNewlines(packet0);
+
 			size_t packetLen = packet.length();
 			size_t packetIndex, bufferIndex;
 
@@ -24,7 +41,10 @@ namespace SextetStream
 			bufferIndex = 0;
 			memset(buffer, 0, bufferSize);
 
+			LOG->Trace("ConvertPacketToState processing '%s' (packet size %u, buffer size %u)", packet.c_str(), (unsigned)packetLen, (unsigned)bufferSize);
+
 			packetIndex = 0;
+
 
 			// Skip initial excess bytes
 			while(packetIndex < packetLen) {
@@ -34,23 +54,27 @@ namespace SextetStream
 				++packetIndex;
 			}
 
+			LOG->Trace("ConvertPacketToState skipped %u leading excess byte(s)", (unsigned)packetIndex);
+
 			// Use bytes from here to next excess byte (or end)
-			while(packetIndex < packetLen) {
+			while((packetIndex < packetLen) && (bufferIndex < bufferSize)) {
 				uint8_t b = packet[packetIndex];
 				if(IsValidSextetByte(b)) {
 					buffer[bufferIndex] = ClearArmor(b);
-
-					if(bufferIndex >= bufferSize) {
-						// No more room
-						return false;
-					}
-
-					++packetIndex;
-				}
-				else {
-					// No more bytes to process
+					bufferIndex++;
+					packetIndex++;
+				} else {
+					LOG->Trace("ConvertPacketToState converted %u byte(s); stopped at non-sextet char 0x%02x", (unsigned)packetIndex, (unsigned)b);
 					return true;
 				}
+			}
+
+			if(packetIndex < packetLen) {
+				LOG->Trace("ConvertPacketToState converted %u byte(s); output buffer full", (unsigned)packetIndex);
+				return false;
+			} else {
+				LOG->Trace("ConvertPacketToState converted %u byte(s); packet fully read", (unsigned)packetIndex);
+				return true;
 			}
 		}
 
@@ -70,13 +94,11 @@ namespace SextetStream
 				for(size_t subBitIndex = 0; subBitIndex < 6; ++subBitIndex) {
 					size_t bitIndex = (byteIndex * 6) + subBitIndex;
 					if(bitIndex < bitCount) {
-						if(BIT_IN_BYTE_BUFFER(changedBits, byteIndex, subBitIndex))
-						{
+						if(BIT_IN_BYTE_BUFFER(changedBits, byteIndex, subBitIndex)) {
 							bool value = BIT_IN_BYTE_BUFFER(state, byteIndex, subBitIndex);
 							updateButton(context, bitIndex, value);
 						}
-					}
-					else {
+					} else {
 						// bitCount reached
 						break;
 					}
