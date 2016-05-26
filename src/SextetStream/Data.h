@@ -21,10 +21,6 @@ namespace SextetStream
 		// 0x30 .. 0x6F.
 		uint8_t ApplyArmor(uint8_t value);
 
-		// Apply armor in-place to all characters of an RString.
-		// (This does not trim excess characters first.)
-		void ApplyArmor(RString& str);
-
 		// Retrieves the first span of valid sextet characters
 		// (`IsValidSextetByte()`) within the string. All characters before
 		// the first valid character, and all characters starting with the
@@ -44,9 +40,19 @@ namespace SextetStream
 		// source arrays.
 		void XorBuffers(uint8_t * result, const uint8_t * a, const uint8_t * b, size_t size);
 
+		// Performs XOR on a pair of packets in RString form, re-armoring
+		// the result.
+		// If either packet is shorter than the other, the shorter packet is
+		// extended 
+		void XorPackets(RString& result, const RString& a, const RString& b);
+		RString XorPacketsCopy(const RString& a, const RString& b);
+
 		// Examines the bits that have changed in a state and calls a
 		// callback for each change.
 		void ProcessChanges(const uint8_t * state, const uint8_t * changedBits, size_t bufferSize, size_t bitCount, void * context, void updateButton(void * context, size_t index, bool value));
+
+		// Examines the 
+		void ProcessPacketChanges(const RString& statePacket, const RString& changedPacket, size_t numberOfStateBits, void * context, void updateButton(void * context, size_t index, bool value));
 
 		// Compares two RStrings and determines whether their contents would
 		// be equal as sextet packets. The top two bits of each character
@@ -59,8 +65,8 @@ namespace SextetStream
 		// LightsState.
 		RString GetLightsStateAsPacket(const LightsState* ls);
 
-		// Initializes an RString from the supplied buffer.
-		RString BytesToRString(const void * buffer, size_t sizeInBytes);
+		// Produces an RString by armoring the supplied buffer.
+		RString BytesToPacket(const void * buffer, size_t sizeInBytes);
 	}
 }
 

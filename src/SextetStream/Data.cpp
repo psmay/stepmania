@@ -11,15 +11,27 @@ static const size_t CONTROLLER_SEXTET_COUNT = 6;
 static const size_t FULL_SEXTET_COUNT = CABINET_SEXTET_COUNT + (NUM_GameController * CONTROLLER_SEXTET_COUNT);
 
 #define SEXTET_PART(n) ((n) & 0x3F)
+#define SEXTET_PART_XOR(a,b) SEXTET_PART((a)^(b))
 #define SEXTET_PART_EQUALS_ZERO(n) (SEXTET_PART(n) == 0)
 #define SEXTET_PARTS_EQUAL(a,b) SEXTET_PART_EQUALS_ZERO((a)^(b))
 
 #define SWAP_VIA(tmp, a, b) { tmp = a; a = b; b = tmp; }
 
+// In so many words, ceil(n/6).
+#define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
+
 namespace SextetStream
 {
 	namespace Data
 	{
+		inline size_t min(size_t a, size_t b) {
+			return (a < b) ? a : b;
+		}
+
+		inline size_t max(size_t a, size_t b) {
+			return (a > b) ? a : b;
+		}
+
 		bool IsValidSextetByte(uint8_t value)
 		{
 			return (value >= 0x30) && (value <= 0x6F);
@@ -142,34 +154,79 @@ namespace SextetStream
 			}
 		}
 
-		void XorBuffers(uint8_t * result, const uint8_t * a, const uint8_t * b, size_t size)
+		inline void XorPacketsSameLength(RString& dest, const RString& other)
 		{
-			size_t i;
-			for(i = 0; i < size; ++i) {
-				result[i] = a[i] ^ b[i];
+			size_t size = dest.length();
+			for(size_t i = 0; i < size; ++i) {
+				dest[i] = ApplyArmor(dest[i] ^ other[i]);
 			}
+		}
+
+		void XorPackets(RString& dest, const RString& a, const RString& b)
+		{
+			const RString * longSource;
+			const RString * shortSource;
+
+			if(a.length() > b.length()) {
+				longSource = &a;
+				shortSource = &b;
+			}
+			else {
+				longSource = &b;
+				shortSource = &a;
+			}
+			
+			dest = *shortSource;
+			dest.resize(longSource->length(), ApplyArmor(0));
+			XorPacketsSameLength(dest, *longSource);
+		}
+
+		RString XorPacketsCopy(const RString& a, const RString& b)
+		{
+			RString dest;
+			XorPackets(dest, a, b);
+			return dest;
 		}
 
 #define BIT_IN_BYTE_BUFFER(buffer, byteIndex, subBitIndex) (buffer[byteIndex] & (1 << subBitIndex))
 
-		void ProcessChanges(const uint8_t * state, const uint8_t * changedBits, size_t bufferSize, size_t bitCount, void * context, void updateButton(void * context, size_t index, bool value))
+		void ProcessPacketChanges(const RString& statePacket, const RString& changedPacket, size_t numberOfStateBits, void * context, void updateButton(void * context, size_t index, bool value))
 		{
+			RString fallbackStatePacket;
+
+			// The max number of bytes numberOfStateBits covers or the size
+			// of the changes packet, whichever is smaller
+			size_t bufferSize = min(
+					NUMBER_OF_SEXTETS_FOR_BIT_COUNT(numberOfStateBits),
+					changedPacket.length());
+
+			// If the state packet is smaller than the range we wish to
+			// scan, pad out the state with zeroed sextets.
+			const RString * sp;
+			if(statePacket.length() < bufferSize) {
+				fallbackStatePacket = statePacket;
+				fallbackStatePacket.resize(bufferSize, ApplyArmor(0));
+				sp = &fallbackStatePacket;
+			}
+			else {
+				sp = &statePacket;
+			}
+
 			for(size_t byteIndex = 0; byteIndex < bufferSize; ++byteIndex) {
 				for(size_t subBitIndex = 0; subBitIndex < 6; ++subBitIndex) {
-					size_t bitIndex = (byteIndex * 6) + subBitIndex;
-					if(bitIndex < bitCount) {
-						if(BIT_IN_BYTE_BUFFER(changedBits, byteIndex, subBitIndex)) {
-							bool value = BIT_IN_BYTE_BUFFER(state, byteIndex, subBitIndex);
-							updateButton(context, bitIndex, value);
+					size_t stateBitIndex = (byteIndex * 6) + subBitIndex;
+					if(stateBitIndex < numberOfStateBits) {
+						if(BIT_IN_BYTE_BUFFER(changedPacket, byteIndex, subBitIndex)) {
+							bool value = BIT_IN_BYTE_BUFFER((*sp), byteIndex, subBitIndex);
+							updateButton(context, stateBitIndex, value);
 						}
 					} else {
-						// bitCount reached
+						// numberOfStateBits reached
 						break;
 					}
 				}
 			}
 		}
-
 
 
 
@@ -198,13 +255,6 @@ namespace SextetStream
 			// 	H = ((T + 1) mod 4) + 3
 
 			return ((data + (uint8_t)0x10) & (uint8_t)0x3F) + (uint8_t)0x30;
-		}
-
-		void ApplyArmor(RString& str)
-		{
-			for(RString::iterator it = str.begin(); it != str.end(); ++it) {
-				*it = ApplyArmor(*it);
-			}
 		}
 
 		// Packs 6 booleans into a 6-bit value
@@ -306,25 +356,23 @@ namespace SextetStream
 			return index;
 		}
 
-		RString BytesToRString(const void * buffer, size_t sizeInBytes)
+		RString BytesToPacket(const void * buffer, size_t sizeInBytes)
 		{
 			const char * charBuffer = (const char *) buffer;
+			RString dest = RString(sizeInBytes, ApplyArmor(0));
+
+			for(size_t i = 0; i < sizeInBytes; ++i) {
+				dest[i] = ApplyArmor(charBuffer[i]);
+			}
+			
 			return RString(charBuffer, sizeInBytes);
-		}
-
-
-		RString BytesToArmoredRString(const void * buffer, size_t sizeInBytes)
-		{
-			RString dest = BytesToRString(buffer, sizeInBytes);
-			ApplyArmor(dest);
-			return dest;
 		}
 
 		RString GetLightsStateAsPacket(const LightsState* ls)
 		{
 			uint8_t buffer[FULL_SEXTET_COUNT];
 			size_t len = AppendAllLights(buffer, ls);
-			return BytesToRString(buffer, len);
+			return BytesToPacket(buffer, len);
 		}
 
 

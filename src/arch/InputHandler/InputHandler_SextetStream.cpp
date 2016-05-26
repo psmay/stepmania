@@ -62,7 +62,7 @@ namespace
 class InputHandler_SextetStream::Impl
 {
 private:
-	uint8_t stateBuffer[STATE_BUFFER_SIZE];
+	RString previousStatePacket;
 	InputHandler_SextetStream * handler;
 	PacketReaderEventGenerator * eventGenerator;
 	InputDevice id;
@@ -89,18 +89,18 @@ private:
 		uint8_t newStateBuffer[STATE_BUFFER_SIZE];
 		uint8_t changes[STATE_BUFFER_SIZE];
 
-		ConvertPacketToState(newStateBuffer, STATE_BUFFER_SIZE, packet);
-		XorBuffers(changes, stateBuffer, newStateBuffer, STATE_BUFFER_SIZE);
+		RString newStatePacket = CleanPacketCopy(packet);
+		RString packetChanges = XorPacketsCopy(previousStatePacket, newStatePacket);
 
 		// Update state
-		memcpy(stateBuffer, newStateBuffer, STATE_BUFFER_SIZE);
+		previousStatePacket = newStatePacket;
 
 		// Update device input states
 		id = InputDevice(FIRST_DEVICE);
 		now = RageTimer();
 
 		// Trigger button presses
-		ProcessChanges(newStateBuffer, changes, STATE_BUFFER_SIZE, BUTTON_COUNT, this, TriggerUpdateButton);
+		SextetStream::Data::ProcessPacketChanges(newStatePacket, packetChanges, BUTTON_COUNT, this, TriggerUpdateButton);
 	}
 
 
@@ -113,7 +113,7 @@ public:
 		this->handler = handler;
 		
 		// Clear the state buffer initially.
-		memset(stateBuffer, 0, STATE_BUFFER_SIZE);
+		previousStatePacket = "";
 
 		eventGenerator = PacketReaderEventGenerator::Create(packetReader, (void*) this, TriggerOnReadPacket);
 
