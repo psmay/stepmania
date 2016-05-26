@@ -3,6 +3,9 @@
 
 #include "global.h"
 
+// Needed for GetLightsStateAsPacket
+struct LightsState;
+
 namespace SextetStream
 {
 	namespace Data
@@ -14,6 +17,21 @@ namespace SextetStream
 		// Clears the top 2 bits of a byte.
 		uint8_t ClearArmor(uint8_t value);
 
+		// Alters the top 2 bits of a byte to produce a printable value in
+		// 0x30 .. 0x6F.
+		uint8_t ApplyArmor(uint8_t value);
+
+		// Apply armor in-place to all characters of an RString.
+		// (This does not trim excess characters first.)
+		void ApplyArmor(RString& str);
+
+		// Retrieves the first span of valid sextet characters
+		// (`IsValidSextetByte()`) within the string. All characters before
+		// the first valid character, and all characters starting with the
+		// first invalid character after the first valid character, are
+		// discarded.
+		void CleanPacket(RString& str);
+		RString CleanPacketCopy(const RString& str);
 
 		// Given a raw packet, trims excess characters and removes armoring
 		// bits, then places the result in a state byte array. Returns true
@@ -29,6 +47,20 @@ namespace SextetStream
 		// Examines the bits that have changed in a state and calls a
 		// callback for each change.
 		void ProcessChanges(const uint8_t * state, const uint8_t * changedBits, size_t bufferSize, size_t bitCount, void * context, void updateButton(void * context, size_t index, bool value));
+
+		// Compares two RStrings and determines whether their contents would
+		// be equal as sextet packets. The top two bits of each character
+		// are discarded before comparing, but no excess characters are
+		// trimmed. If one string is longer than the other, they are
+		// compared as if both had infinite trailing zeros.
+		bool RStringSextetsEqual(const RString& a, const RString& b);
+
+		// Retrieves a sextet packet containing the information from a
+		// LightsState.
+		RString GetLightsStateAsPacket(const LightsState* ls);
+
+		// Initializes an RString from the supplied buffer.
+		RString BytesToRString(const void * buffer, size_t sizeInBytes);
 	}
 }
 
