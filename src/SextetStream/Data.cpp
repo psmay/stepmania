@@ -20,10 +20,8 @@ static const size_t FULL_SEXTET_COUNT = CABINET_SEXTET_COUNT + (NUM_GameControll
 // In so many words, ceil(n/6).
 #define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
 
-namespace SextetStream
+namespace
 {
-	namespace Data
-	{
 		inline size_t min(size_t a, size_t b) {
 			return (a < b) ? a : b;
 		}
@@ -35,6 +33,27 @@ namespace SextetStream
 		bool IsValidSextetByte(uint8_t value)
 		{
 			return (value >= 0x30) && (value <= 0x6F);
+		}
+
+		// Encodes the low 6 bits of a byte as a printable, non-space ASCII
+		// character (i.e., within the range 0x21-0x7E) such that the low 6 bits of
+		// the character are the same as the input.
+		uint8_t ApplyArmor(uint8_t data)
+		{
+			// Maps the 6-bit value into the range 0x30-0x6F, wrapped in such a way
+			// that the low 6 bits of the result are the same as the data (so
+			// decoding is trivial).
+			//
+			//	00nnnn	->	0100nnnn (0x4n)
+			//	01nnnn	->	0101nnnn (0x5n)
+			//	10nnnn	->	0110nnnn (0x6n)
+			//	11nnnn	->	0011nnnn (0x3n)
+
+			// Put another way, the top 4 bits H of the output are determined from
+			// the top two bits T of the input like so:
+			// 	H = ((T + 1) mod 4) + 3
+
+			return ((data + (uint8_t)0x10) & (uint8_t)0x3F) + (uint8_t)0x30;
 		}
 
 		uint8_t ClearArmor(uint8_t value)
@@ -64,45 +83,6 @@ namespace SextetStream
 				// Found the last non-newline character
 				return found + 1;
 			}
-		}
-
-		RString CleanPacketCopy(const RString& str)
-		{
-			size_t left = 0;
-			size_t right;
-			size_t end = IndexOfTrimmableNewlines(str);
-
-			// Find first valid byte
-			while(left < end) {
-				if(IsValidSextetByte(str[left])) {
-					break;
-				}
-				++left;
-			}
-
-			if(left > 0) {
-				LOG->Trace("CleanPacketCopy skipped %u leading excess byte(s)", (unsigned)left);
-			}
-
-			// Find first invalid byte after that
-			right = left;
-			while(right < end) {
-				if(!IsValidSextetByte(str[right])) {
-					break;
-				}
-				++right;
-			}
-
-			if(right < end) {
-				LOG->Trace("CleanPacketCopy truncated after %u byte(s); stopped at non-sextet char 0x%02x", (unsigned)right, (unsigned)(str[right]));
-			}
-
-			return str.substr(left, right - left);
-		}
-
-		void CleanPacket(RString& str)
-		{
-			str = CleanPacketCopy(str);
 		}
 
 		bool ConvertPacketToState(uint8_t * buffer, size_t bufferSize, const RString& packet0)
@@ -179,82 +159,6 @@ namespace SextetStream
 			dest = *shortSource;
 			dest.resize(longSource->length(), ApplyArmor(0));
 			XorPacketsSameLength(dest, *longSource);
-		}
-
-		RString XorPacketsCopy(const RString& a, const RString& b)
-		{
-			RString dest;
-			XorPackets(dest, a, b);
-			return dest;
-		}
-
-#define BIT_IN_BYTE_BUFFER(buffer, byteIndex, subBitIndex) (buffer[byteIndex] & (1 << subBitIndex))
-
-		void ProcessPacketChanges(const RString& statePacket, const RString& changedPacket, size_t numberOfStateBits, void * context, void updateButton(void * context, size_t index, bool value))
-		{
-			RString fallbackStatePacket;
-
-			// The max number of bytes numberOfStateBits covers or the size
-			// of the changes packet, whichever is smaller
-			size_t bufferSize = min(
-					NUMBER_OF_SEXTETS_FOR_BIT_COUNT(numberOfStateBits),
-					changedPacket.length());
-
-			// If the state packet is smaller than the range we wish to
-			// scan, pad out the state with zeroed sextets.
-			const RString * sp;
-			if(statePacket.length() < bufferSize) {
-				fallbackStatePacket = statePacket;
-				fallbackStatePacket.resize(bufferSize, ApplyArmor(0));
-				sp = &fallbackStatePacket;
-			}
-			else {
-				sp = &statePacket;
-			}
-
-			for(size_t byteIndex = 0; byteIndex < bufferSize; ++byteIndex) {
-				for(size_t subBitIndex = 0; subBitIndex < 6; ++subBitIndex) {
-					size_t stateBitIndex = (byteIndex * 6) + subBitIndex;
-					if(stateBitIndex < numberOfStateBits) {
-						if(BIT_IN_BYTE_BUFFER(changedPacket, byteIndex, subBitIndex)) {
-							bool value = BIT_IN_BYTE_BUFFER((*sp), byteIndex, subBitIndex);
-							updateButton(context, stateBitIndex, value);
-						}
-					} else {
-						// numberOfStateBits reached
-						break;
-					}
-				}
-			}
-		}
-
-
-
-
-
-
-
-		///////////////////////////
-
-		// Encodes the low 6 bits of a byte as a printable, non-space ASCII
-		// character (i.e., within the range 0x21-0x7E) such that the low 6 bits of
-		// the character are the same as the input.
-		uint8_t ApplyArmor(uint8_t data)
-		{
-			// Maps the 6-bit value into the range 0x30-0x6F, wrapped in such a way
-			// that the low 6 bits of the result are the same as the data (so
-			// decoding is trivial).
-			//
-			//	00nnnn	->	0100nnnn (0x4n)
-			//	01nnnn	->	0101nnnn (0x5n)
-			//	10nnnn	->	0110nnnn (0x6n)
-			//	11nnnn	->	0011nnnn (0x3n)
-
-			// Put another way, the top 4 bits H of the output are determined from
-			// the top two bits T of the input like so:
-			// 	H = ((T + 1) mod 4) + 3
-
-			return ((data + (uint8_t)0x10) & (uint8_t)0x3F) + (uint8_t)0x30;
 		}
 
 		// Packs 6 booleans into a 6-bit value
@@ -368,15 +272,6 @@ namespace SextetStream
 			return RString(charBuffer, sizeInBytes);
 		}
 
-		RString GetLightsStateAsPacket(const LightsState* ls)
-		{
-			uint8_t buffer[FULL_SEXTET_COUNT];
-			size_t len = AppendAllLights(buffer, ls);
-			return BytesToPacket(buffer, len);
-		}
-
-
-
 		inline bool BuffersEqualAsSextets(const char * a, size_t aLength, const char * b, size_t bLength)
 		{
 			const char * sbuf = a;
@@ -416,18 +311,106 @@ namespace SextetStream
 
 			return true;
 		}
+}
+
+namespace SextetStream
+{
+	namespace Data
+	{
+		RString CleanPacketCopy(const RString& str)
+		{
+			size_t left = 0;
+			size_t right;
+			size_t end = IndexOfTrimmableNewlines(str);
+
+			// Find first valid byte
+			while(left < end) {
+				if(IsValidSextetByte(str[left])) {
+					break;
+				}
+				++left;
+			}
+
+			if(left > 0) {
+				LOG->Trace("CleanPacketCopy skipped %u leading excess byte(s)", (unsigned)left);
+			}
+
+			// Find first invalid byte after that
+			right = left;
+			while(right < end) {
+				if(!IsValidSextetByte(str[right])) {
+					break;
+				}
+				++right;
+			}
+
+			if(right < end) {
+				LOG->Trace("CleanPacketCopy truncated after %u byte(s); stopped at non-sextet char 0x%02x", (unsigned)right, (unsigned)(str[right]));
+			}
+
+			return str.substr(left, right - left);
+		}
+
+		RString XorPacketsCopy(const RString& a, const RString& b)
+		{
+			RString dest;
+			XorPackets(dest, a, b);
+			return dest;
+		}
+
+#define BIT_IN_BYTE_BUFFER(buffer, byteIndex, subBitIndex) (buffer[byteIndex] & (1 << subBitIndex))
+
+		void ProcessPacketChanges(const RString& statePacket, const RString& changedPacket, size_t numberOfStateBits, void * context, void updateButton(void * context, size_t index, bool value))
+		{
+			RString fallbackStatePacket;
+
+			// The max number of bytes numberOfStateBits covers or the size
+			// of the changes packet, whichever is smaller
+			size_t bufferSize = min(
+					NUMBER_OF_SEXTETS_FOR_BIT_COUNT(numberOfStateBits),
+					changedPacket.length());
+
+			// If the state packet is smaller than the range we wish to
+			// scan, pad out the state with zeroed sextets.
+			const RString * sp;
+			if(statePacket.length() < bufferSize) {
+				fallbackStatePacket = statePacket;
+				fallbackStatePacket.resize(bufferSize, ApplyArmor(0));
+				sp = &fallbackStatePacket;
+			}
+			else {
+				sp = &statePacket;
+			}
+
+			for(size_t byteIndex = 0; byteIndex < bufferSize; ++byteIndex) {
+				for(size_t subBitIndex = 0; subBitIndex < 6; ++subBitIndex) {
+					size_t stateBitIndex = (byteIndex * 6) + subBitIndex;
+					if(stateBitIndex < numberOfStateBits) {
+						if(BIT_IN_BYTE_BUFFER(changedPacket, byteIndex, subBitIndex)) {
+							bool value = BIT_IN_BYTE_BUFFER((*sp), byteIndex, subBitIndex);
+							updateButton(context, stateBitIndex, value);
+						}
+					} else {
+						// numberOfStateBits reached
+						break;
+					}
+				}
+			}
+		}
+
+		RString GetLightsStateAsPacket(const LightsState* ls)
+		{
+			uint8_t buffer[FULL_SEXTET_COUNT];
+			size_t len = AppendAllLights(buffer, ls);
+			return BytesToPacket(buffer, len);
+		}
 
 		bool RStringSextetsEqual(const RString& a, const RString& b)
 		{
 			return BuffersEqualAsSextets(a.data(), a.length(), b.data(), b.length());
 		}
-
-
-
-		///////////////////////////
 	}
 }
-
 
 /*
  * Copyright © 2016 Peter S. May
