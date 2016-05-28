@@ -26,10 +26,6 @@ namespace
 			return (a < b) ? a : b;
 		}
 
-		inline size_t max(size_t a, size_t b) {
-			return (a > b) ? a : b;
-		}
-
 		bool IsValidSextetByte(uint8_t value)
 		{
 			return (value >= 0x30) && (value <= 0x6F);
@@ -56,11 +52,6 @@ namespace
 			return ((data + (uint8_t)0x10) & (uint8_t)0x3F) + (uint8_t)0x30;
 		}
 
-		uint8_t ClearArmor(uint8_t value)
-		{
-			return SEXTET_PART(value);
-		}
-
 		void TrimTrailingNewlines(RString& str)
 		{
 			size_t found = str.find_last_not_of("\x0A\x0D");
@@ -82,55 +73,6 @@ namespace
 			} else {
 				// Found the last non-newline character
 				return found + 1;
-			}
-		}
-
-		bool ConvertPacketToState(uint8_t * buffer, size_t bufferSize, const RString& packet0)
-		{
-			RString packet = packet0;
-			TrimTrailingNewlines(packet);
-
-			size_t packetLen = packet.length();
-			size_t packetIndex, bufferIndex;
-
-			// Clear buffer
-			bufferIndex = 0;
-			memset(buffer, 0, bufferSize);
-
-			LOG->Trace("ConvertPacketToState processing '%s' (packet size %u, buffer size %u)", packet.c_str(), (unsigned)packetLen, (unsigned)bufferSize);
-
-			packetIndex = 0;
-
-
-			// Skip initial excess bytes
-			while(packetIndex < packetLen) {
-				if(IsValidSextetByte(packet[packetIndex])) {
-					break;
-				}
-				++packetIndex;
-			}
-
-			LOG->Trace("ConvertPacketToState skipped %u leading excess byte(s)", (unsigned)packetIndex);
-
-			// Use bytes from here to next excess byte (or end)
-			while((packetIndex < packetLen) && (bufferIndex < bufferSize)) {
-				uint8_t b = packet[packetIndex];
-				if(IsValidSextetByte(b)) {
-					buffer[bufferIndex] = ClearArmor(b);
-					bufferIndex++;
-					packetIndex++;
-				} else {
-					LOG->Trace("ConvertPacketToState converted %u byte(s); stopped at non-sextet char 0x%02x", (unsigned)packetIndex, (unsigned)b);
-					return true;
-				}
-			}
-
-			if(packetIndex < packetLen) {
-				LOG->Trace("ConvertPacketToState converted %u byte(s); output buffer full", (unsigned)packetIndex);
-				return false;
-			} else {
-				LOG->Trace("ConvertPacketToState converted %u byte(s); packet fully read", (unsigned)packetIndex);
-				return true;
 			}
 		}
 
