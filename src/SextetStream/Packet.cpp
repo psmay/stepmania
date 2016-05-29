@@ -1,10 +1,10 @@
 
-#include "SextetStream/Data/Packet.h"
+#include "SextetStream/Packet.h"
 #include "RageLog.h"
 
 typedef RString::value_type RChr;
 typedef std::vector<RChr> RVector;
-typedef SextetStream::Data::Packet::ProcessEventCallback ProcessEventCallback;
+typedef SextetStream::Packet::ProcessEventCallback ProcessEventCallback;
 
 namespace
 {
@@ -216,127 +216,124 @@ namespace
 
 namespace SextetStream
 {
-	namespace Data
+	class Packet::Impl
 	{
-		class Packet::Impl
+	private:
+		RVector sextets;
+
+		void SetToSextetDataLine(const RString& line, size_t left, size_t right)
 		{
-		private:
-			RVector sextets;
+			size_t length = right - left;
 
-			void SetToSextetDataLine(const RString& line, size_t left, size_t right)
-			{
-				size_t length = right - left;
+			sextets.resize(length);
 
-				sextets.resize(length);
+			RString::const_iterator stringIt = line.begin();
+			std::advance(stringIt, left);
 
-				RString::const_iterator stringIt = line.begin();
-				std::advance(stringIt, left);
+			RString::const_iterator stringEnd = stringIt;
+			std::advance(stringEnd, length);
 
-				RString::const_iterator stringEnd = stringIt;
-				std::advance(stringEnd, length);
+			RVector::iterator vectorIt = sextets.begin();
 
-				RVector::iterator vectorIt = sextets.begin();
-
-				for(; stringIt != stringEnd; ++stringIt, ++vectorIt) {
-					*vectorIt = Armored(*stringIt);
-				}
+			for(; stringIt != stringEnd; ++stringIt, ++vectorIt) {
+				*vectorIt = Armored(*stringIt);
 			}
-
-		public:
-			Impl()
-			{
-			}
-
-			~Impl() {}
-
-			void Clear()
-			{
-				sextets.clear();
-			}
-
-			void Copy(const Packet& packet)
-			{
-				sextets = packet._impl->sextets;
-			}
-
-			void SetToLine(const RString& line)
-			{
-				size_t left = FindCleanPacketLeft(line);
-				size_t right = FindCleanPacketRight(line, left);
-				SetToSextetDataLine(line, left, right);
-			}
-
-			void SetToXor(const Packet& b)
-			{
-				XorVectors(sextets, b._impl->sextets);
-			}
-
-			void SetToXor(const Packet& a, const Packet& b)
-			{
-				XorVectors(sextets, a._impl->sextets, b._impl->sextets);
-			}
-
-			void ProcessEventData(const Packet& eventData, size_t bitCount, void * context, ProcessEventCallback callback)
-			{
-				ProcessEventDataVectors(eventData._impl->sextets, sextets, bitCount, context, callback);
-			}
-
-			bool Equals(const Packet& b)
-			{
-				VectorsEqual(sextets, b._impl->sextets);
-			}
-		};
-
-		Packet::Packet()
-		{
-			_impl = new Packet::Impl();
 		}
 
-		Packet::Packet(const Packet& packet)
+	public:
+		Impl()
 		{
-			_impl = new Packet::Impl();
-			_impl->Copy(packet);
 		}
 
-		Packet::~Packet()
+		~Impl() {}
+
+		void Clear()
 		{
-			delete _impl;
+			sextets.clear();
 		}
 
-		void Packet::Clear()
+		void Copy(const Packet& packet)
 		{
-			_impl->Clear();
+			sextets = packet._impl->sextets;
 		}
 
-		void Packet::Copy(const Packet& packet)
+		void SetToLine(const RString& line)
 		{
-			_impl->Copy(packet);
+			size_t left = FindCleanPacketLeft(line);
+			size_t right = FindCleanPacketRight(line, left);
+			SetToSextetDataLine(line, left, right);
 		}
 
-		void Packet::SetToLine(const RString& line)
+		void SetToXor(const Packet& b)
 		{
-			_impl->SetToLine(line);
+			XorVectors(sextets, b._impl->sextets);
 		}
 
-		void Packet::SetToXor(const Packet& b)
+		void SetToXor(const Packet& a, const Packet& b)
 		{
-			_impl->SetToXor(b);
+			XorVectors(sextets, a._impl->sextets, b._impl->sextets);
 		}
 
-		void Packet::SetToXor(const Packet& a, const Packet& b)
+		void ProcessEventData(const Packet& eventData, size_t bitCount, void * context, ProcessEventCallback callback)
 		{
-			_impl->SetToXor(a, b);
+			ProcessEventDataVectors(eventData._impl->sextets, sextets, bitCount, context, callback);
 		}
 
-		void Packet::ProcessEventData(const Packet& eventData, size_t bitCount, void * context, ProcessEventCallback callback)
+		bool Equals(const Packet& b)
 		{
-			_impl->ProcessEventData(eventData, bitCount, context, callback);
+			VectorsEqual(sextets, b._impl->sextets);
 		}
+	};
 
-		bool Packet::Equals(const Packet& b)
-		{
-			return _impl->Equals(b);
-		}
+	Packet::Packet()
+	{
+		_impl = new Packet::Impl();
+	}
+
+	Packet::Packet(const Packet& packet)
+	{
+		_impl = new Packet::Impl();
+		_impl->Copy(packet);
+	}
+
+	Packet::~Packet()
+	{
+		delete _impl;
+	}
+
+	void Packet::Clear()
+	{
+		_impl->Clear();
+	}
+
+	void Packet::Copy(const Packet& packet)
+	{
+		_impl->Copy(packet);
+	}
+
+	void Packet::SetToLine(const RString& line)
+	{
+		_impl->SetToLine(line);
+	}
+
+	void Packet::SetToXor(const Packet& b)
+	{
+		_impl->SetToXor(b);
+	}
+
+	void Packet::SetToXor(const Packet& a, const Packet& b)
+	{
+		_impl->SetToXor(a, b);
+	}
+
+	void Packet::ProcessEventData(const Packet& eventData, size_t bitCount, void * context, ProcessEventCallback callback)
+	{
+		_impl->ProcessEventData(eventData, bitCount, context, callback);
+	}
+
+	bool Packet::Equals(const Packet& b)
+	{
+		return _impl->Equals(b);
 	}
 }
 

@@ -14,7 +14,7 @@ list(APPEND SMDATA_SEXTETSTREAM_LIB_SRC
   "SextetStream/IO/StdCFilePacketReader.cpp"
   "SextetStream/IO/PacketReaderEventGenerator.cpp"
   "SextetStream/IO/NoopPacketWriter.cpp"
-  "SextetStream/Data/Packet.cpp"
+  "SextetStream/Packet.cpp"
 )
 list(APPEND SMDATA_SEXTETSTREAM_LIB_HPP
   "SextetStream/IO/PacketWriter.h"
@@ -23,8 +23,8 @@ list(APPEND SMDATA_SEXTETSTREAM_LIB_HPP
   "SextetStream/IO/NoopPacketWriter.h"
   "SextetStream/IO/PacketReader.h"
   "SextetStream/IO/StdCFilePacketReader.h"
+  "SextetStream/Packet.h"
   "SextetStream/Data.h"
-  "SextetStream/Data/Packet.h"
 )
 source_group("SextetStream Support Library" FILES ${SMDATA_SEXTETSTREAM_LIB_SRC} ${SMDATA_SEXTETSTREAM_LIB_HPP})
 
