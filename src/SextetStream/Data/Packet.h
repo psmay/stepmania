@@ -14,7 +14,38 @@ namespace SextetStream
 		{
 		public:
 			Packet();
+			Packet(const Packet& packet);
 			~Packet();
+
+			void Clear();
+
+			void Copy(const Packet& packet);
+
+			// Sets this packet to the first span of valid sextet characters
+			// within the string. All characters before the first valid
+			// character, and all characters starting with the first invalid
+			// character after the first valid character, are discarded.
+			void SetToLine(const RString& line);
+
+			// Calculates this XOR b, then assigns the result to this
+			// packet.
+			void SetToXor(const Packet& b);
+
+			// Calculates a XOR b, then assigns the result to this packet.
+			void SetToXor(const Packet& a, const Packet& b);
+
+			typedef void (*ProcessEventCallback)(void * context,
+												 size_t bitIndex, bool value);
+
+			// Examines the low `bitCount` bits of `eventData` and, for each
+			// `1` bit found, calls a callback with the bit index and value
+			// of the bit at the same index of this packet.
+			void ProcessEventData(const Packet& eventData, size_t bitCount,
+								  void * context, ProcessEventCallback callback);
+
+			// Gets whether this packet is equal to another packet if all
+			// `0` bits are trimmed off the right of both.
+			bool Equals(const Packet& b);
 
 		private:
 			class Impl;
