@@ -25,6 +25,10 @@ namespace SextetStream
 		// character after the first valid character, are discarded.
 		void SetToLine(const RString& line);
 
+		// Sets this packet to the values corresponding to the given lights
+		// state.
+		void SetToLightsState(const LightsState * ls);
+
 		// Calculates this XOR b, then assigns the result to this
 		// packet.
 		void SetToXor(const Packet& b);
@@ -39,11 +43,16 @@ namespace SextetStream
 		// `1` bit found, calls a callback with the bit index and value
 		// of the bit at the same index of this packet.
 		void ProcessEventData(const Packet& eventData, size_t bitCount,
-							  void * context, ProcessEventCallback callback);
+							  void * context, ProcessEventCallback callback) const;
 
 		// Gets whether this packet is equal to another packet if all
 		// `0` bits are trimmed off the right of both.
-		bool Equals(const Packet& b);
+		bool Equals(const Packet& b) const;
+
+		RString GetLine() const;
+		void GetLine(RString& line) const;
+
+		bool IsClear();
 
 	private:
 		class Impl;

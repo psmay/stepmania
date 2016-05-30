@@ -20,7 +20,7 @@ namespace SextetStream
 		{
 			return false;
 		}
-		bool NoopPacketWriter::WritePacket(const RString& packet)
+		bool NoopPacketWriter::WritePacket(const SextetStream::Packet& packet)
 		{
 			return false;
 		}

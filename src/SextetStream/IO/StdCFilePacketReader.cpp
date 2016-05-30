@@ -51,22 +51,26 @@ namespace
 				return file != NULL;
 			}
 
-			virtual bool ReadPacket(RString& packet)
+			virtual bool ReadPacket(SextetStream::Packet& packet)
 			{
 				bool afterFirst = false;
-				size_t len;
-
-				packet = "";
 
 				if(file != NULL) {
+					RString line;
+
 					while(fgets(buffer, BUFFER_SIZE, file) != NULL) {
 						afterFirst = true;
-						packet += buffer;
-						len = packet.length();
-						if(len > 0 && packet[len - 1] == 0xA) {
-							break;
+						line += buffer;
+						size_t lineLength = line.length();
+						if(lineLength > 0) {
+							int lastChar = line[lineLength - 1];
+							if(lastChar == 0xD || lastChar == 0xA) {
+								break;
+							}
 						}
 					}
+
+					packet.SetToLine(line);
 				}
 
 				return afterFirst;

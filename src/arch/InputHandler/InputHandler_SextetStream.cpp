@@ -14,8 +14,8 @@
 #include <cstring>
 
 using namespace std;
+using namespace SextetStream;
 using namespace SextetStream::IO;
-using namespace SextetStream::Data;
 
 // In so many words, ceil(n/6).
 #define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
@@ -62,7 +62,7 @@ namespace
 class InputHandler_SextetStream::Impl
 {
 private:
-	RString previousStatePacket;
+	Packet previousStatePacket;
 	InputHandler_SextetStream * handler;
 	PacketReaderEventGenerator * eventGenerator;
 	InputDevice id;
@@ -73,7 +73,7 @@ private:
 		((Impl*)p)->UpdateButton(index, value);
 	}
 
-	static void TriggerOnReadPacket(void * p, const RString& packet)
+	static void TriggerOnReadPacket(void * p, const Packet& packet)
 	{
 		((Impl*)p)->OnReadPacket(packet);
 	}
@@ -84,23 +84,20 @@ private:
 		handler->ButtonPressed(di);
 	}
 
-	void OnReadPacket(const RString& packet)
+	void OnReadPacket(const Packet& newStatePacket)
 	{
-		uint8_t newStateBuffer[STATE_BUFFER_SIZE];
-		uint8_t changes[STATE_BUFFER_SIZE];
-
-		RString newStatePacket = CleanPacketCopy(packet);
-		RString packetChanges = XorPacketsCopy(previousStatePacket, newStatePacket);
+		Packet packetChanges = newStatePacket;
+		packetChanges.SetToXor(previousStatePacket);
 
 		// Update state
-		previousStatePacket = newStatePacket;
+		previousStatePacket.Copy(newStatePacket);
 
 		// Update device input states
 		id = InputDevice(FIRST_DEVICE);
 		now = RageTimer();
 
 		// Trigger button presses
-		SextetStream::Data::ProcessPacketChanges(newStatePacket, packetChanges, BUTTON_COUNT, this, TriggerUpdateButton);
+		newStatePacket.ProcessEventData(packetChanges, BUTTON_COUNT, this, TriggerUpdateButton);
 	}
 
 
@@ -112,9 +109,6 @@ public:
 
 		this->handler = handler;
 		
-		// Clear the state buffer initially.
-		previousStatePacket = "";
-
 		eventGenerator = PacketReaderEventGenerator::Create(packetReader, (void*) this, TriggerOnReadPacket);
 
 		if(eventGenerator == NULL) {

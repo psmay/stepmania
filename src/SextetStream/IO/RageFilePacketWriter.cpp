@@ -32,12 +32,12 @@ namespace
 			return out != NULL;
 		}
 
-		bool WritePacket(const RString& packet)
+		bool WritePacket(const SextetStream::Packet& packet)
 		{
 			LOG->Info("RageFilePacketWriter impl WritePacket");
 			if(out != NULL) {
-				out->Write(packet.c_str(), packet.length());
-				out->Write("\x0A", 1);
+				RString line = packet.GetLine();
+				out->PutLine(line);
 				out->Flush();
 			}
 		}

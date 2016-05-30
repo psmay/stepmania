@@ -18,9 +18,9 @@ namespace
 			volatile bool threadEnded;
 			RageThread thread;
 
-			inline void CallOnReadPacket(const RString& packet)
+			inline void CallOnReadPacket(const SextetStream::Packet& packet)
 			{
-				(*onReadPacket)(context, packet);
+				onReadPacket(context, packet);
 			}
 
 			inline void CreateThread()
@@ -59,13 +59,13 @@ namespace
 				LOG->Trace("SextetStream PacketReaderEventGenerator thread started");
 				
 				while(continueThread) {
-					RString packet;
+					SextetStream::Packet packet;
 
 					LOG->Trace("Reading packet");
 
 					if(packetReader->ReadPacket(packet)) {
-						LOG->Trace("Got packet: '%s'", packet.c_str());
-						if(packet.length() > 0) {
+						LOG->Trace("Got packet: '%s'", packet.GetLine().c_str());
+						if(!packet.IsClear()) {
 							CallOnReadPacket(packet);
 						}
 					}

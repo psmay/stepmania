@@ -13,7 +13,7 @@ namespace SextetStream
 		class PacketReaderEventGenerator
 		{
 			public:
-				typedef void PacketReaderEventCallback(void * context, const RString& packet);
+				typedef void PacketReaderEventCallback(void * context, const SextetStream::Packet& packet);
 
 				// Creates a new PacketReaderEventGenerator with the given
 				// parameters. packetReader and onChange must be specified;

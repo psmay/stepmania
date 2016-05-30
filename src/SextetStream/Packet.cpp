@@ -1,6 +1,10 @@
 
 #include "SextetStream/Packet.h"
 #include "RageLog.h"
+#include "global.h"
+#include "LightsManager.h"
+
+#include <vector>
 
 typedef RString::value_type RChr;
 typedef std::vector<RChr> RVector;
@@ -8,19 +12,19 @@ typedef SextetStream::Packet::ProcessEventCallback ProcessEventCallback;
 
 namespace
 {
-	inline size_t max(size_t a, size_t b)
+	inline size_t smax(size_t a, size_t b)
 	{
 		return (a > b) ? a : b;
 	}
 
-	inline size_t min(size_t a, size_t b)
+	inline size_t smin(size_t a, size_t b)
 	{
 		return (a < b) ? a : b;
 	}
 
-	inline size_t min(size_t a, size_t b, size_t c)
+	inline size_t smin(size_t a, size_t b, size_t c)
 	{
-		return min(min(a, b), c);
+		return smin(smin(a, b), c);
 	}
 
 	inline RChr Armored(RChr x)
@@ -71,7 +75,7 @@ namespace
 		size_t alen = a.size();
 		size_t blen = b.size();
 
-		size_t len = min(alen, blen);
+		size_t len = smin(alen, blen);
 
 		// Only perform actual XOR on the common length.
 		for(size_t i = 0; i < len; ++i) {
@@ -171,7 +175,7 @@ namespace
 					// No 1 bits this sextet.
 					continue;
 				}
-				size_t turns = min(6, bitCount - bitStartIndex);
+				size_t turns = smin(6, bitCount - bitStartIndex);
 
 				if(turns > 0) {
 					ProcessOneSextet(eventSextet, valueSextets[sextetIndex], bitStartIndex, turns);
@@ -195,7 +199,7 @@ namespace
 		) :
 			eventSextets(eventSextets),
 			valueSextets(valueSextets),
-			bitCount(min(bitCount, eventSextets.size() * 6)),
+			bitCount(smin(bitCount, eventSextets.size() * 6)),
 			context(context),
 			callback(callback)
 		{
@@ -264,6 +268,120 @@ namespace SextetStream
 			SetToSextetDataLine(line, left, right);
 		}
 
+		void SetToBitVector(const std::vector<bool> bits)
+		{
+			size_t bitCount = bits.size();
+			size_t sextetCount = (bitCount + 5) / 6;
+			
+			sextets.resize(sextetCount, ARMORED_0);	
+
+			size_t sextetIndex = 0;
+			size_t bitIndex = 0;
+			while(bitCount < bitIndex) {
+				RChr s = 0;
+				size_t bitsUsed = smin(bitCount - bitIndex, 6);
+				switch(bitsUsed) {
+					case 6:
+						s |= (bits[bitIndex + 5] ? 0x20 : 0);
+					case 5:
+						s |= (bits[bitIndex + 4] ? 0x10 : 0);
+					case 4:
+						s |= (bits[bitIndex + 3] ? 0x08 : 0);
+					case 3:
+						s |= (bits[bitIndex + 2] ? 0x04 : 0);
+					case 2:
+						s |= (bits[bitIndex + 1] ? 0x02 : 0);
+					case 1:
+						s |= (bits[bitIndex + 0] ? 0x01 : 0);
+					case 0:
+						break;
+				}
+
+				sextets[sextetIndex] = Armored(s);
+				bitIndex += bitsUsed;
+				sextetIndex++;
+			}
+		}
+
+#define PUSH(i) bits.push_back(bitArray[i])
+#define PUSH0() bits.push_back(false)
+
+		void SetToLightsState(const LightsState * ls)
+		{
+			std::vector<bool> bits;
+			const bool * bitArray;
+
+			size_t toReserve = 6; // cabinet lights are 1 sextet, or 6 bits
+			// TODO: Make this non-iterative
+			FOREACH_ENUM(GameController, gc) {
+				// Each controller takes 6 sextets, which is 36 bits.
+				toReserve += (6 * 6);
+			}
+			bits.resize(toReserve, false);
+
+			// cabinet lights
+			bitArray = ls->m_bCabinetLights;
+
+			PUSH(LIGHT_MARQUEE_UP_LEFT);
+			PUSH(LIGHT_MARQUEE_UP_RIGHT);
+			PUSH(LIGHT_MARQUEE_LR_LEFT);
+			PUSH(LIGHT_MARQUEE_LR_RIGHT);
+			PUSH(LIGHT_BASS_LEFT);
+			PUSH(LIGHT_BASS_RIGHT);
+
+			// Game controller lights
+			FOREACH_ENUM(GameController, gc) {
+				bitArray = ls->m_bGameButtonLights[gc];
+
+				// Menu buttons
+				PUSH(GAME_BUTTON_MENULEFT);
+				PUSH(GAME_BUTTON_MENURIGHT);
+				PUSH(GAME_BUTTON_MENUUP);
+				PUSH(GAME_BUTTON_MENUDOWN);
+				PUSH(GAME_BUTTON_START);
+				PUSH(GAME_BUTTON_SELECT);
+
+				// Other non-sensors
+				PUSH(GAME_BUTTON_BACK);
+				PUSH(GAME_BUTTON_COIN);
+				PUSH(GAME_BUTTON_OPERATOR);
+				PUSH(GAME_BUTTON_EFFECT_UP);
+				PUSH(GAME_BUTTON_EFFECT_DOWN);
+				PUSH0();
+
+				// Sensors
+				PUSH(GAME_BUTTON_CUSTOM_01);
+				PUSH(GAME_BUTTON_CUSTOM_02);
+				PUSH(GAME_BUTTON_CUSTOM_03);
+				PUSH(GAME_BUTTON_CUSTOM_04);
+				PUSH(GAME_BUTTON_CUSTOM_05);
+				PUSH(GAME_BUTTON_CUSTOM_06);
+
+				PUSH(GAME_BUTTON_CUSTOM_07);
+				PUSH(GAME_BUTTON_CUSTOM_08);
+				PUSH(GAME_BUTTON_CUSTOM_09);
+				PUSH(GAME_BUTTON_CUSTOM_10);
+				PUSH(GAME_BUTTON_CUSTOM_11);
+				PUSH(GAME_BUTTON_CUSTOM_12);
+
+				PUSH(GAME_BUTTON_CUSTOM_13);
+				PUSH(GAME_BUTTON_CUSTOM_14);
+				PUSH(GAME_BUTTON_CUSTOM_15);
+				PUSH(GAME_BUTTON_CUSTOM_16);
+				PUSH(GAME_BUTTON_CUSTOM_17);
+				PUSH(GAME_BUTTON_CUSTOM_18);
+
+				PUSH(GAME_BUTTON_CUSTOM_19);
+				PUSH0();
+				PUSH0();
+				PUSH0();
+				PUSH0();
+				PUSH0();
+			}
+
+			SetToBitVector(bits);
+		}
+
 		void SetToXor(const Packet& b)
 		{
 			XorVectors(sextets, b._impl->sextets);
@@ -279,9 +397,27 @@ namespace SextetStream
 			ProcessEventDataVectors(eventData._impl->sextets, sextets, bitCount, context, callback);
 		}
 
-		bool Equals(const Packet& b)
+		bool Equals(const Packet& b) const
 		{
 			VectorsEqual(sextets, b._impl->sextets);
+		}
+
+		void GetLine(RString& line)
+		{
+			// TODO
+		}
+
+		RString GetLine()
+		{
+			RString line;
+			GetLine(line);
+			return line;
+		}
+
+		bool IsClear()
+		{
+			// TODO
+			return false;
 		}
 	};
 
@@ -316,6 +452,11 @@ namespace SextetStream
 		_impl->SetToLine(line);
 	}
 
+	void Packet::SetToLightsState(const LightsState * ls)
+	{
+		_impl->SetToLightsState(ls);
+	}
+
 	void Packet::SetToXor(const Packet& b)
 	{
 		_impl->SetToXor(b);
@@ -326,14 +467,29 @@ namespace SextetStream
 		_impl->SetToXor(a, b);
 	}
 
-	void Packet::ProcessEventData(const Packet& eventData, size_t bitCount, void * context, ProcessEventCallback callback)
+	void Packet::ProcessEventData(const Packet& eventData, size_t bitCount, void * context, ProcessEventCallback callback) const
 	{
 		_impl->ProcessEventData(eventData, bitCount, context, callback);
 	}
 
-	bool Packet::Equals(const Packet& b)
+	bool Packet::Equals(const Packet& b) const
 	{
 		return _impl->Equals(b);
+	}
+
+	RString Packet::GetLine() const
+	{
+		return _impl->GetLine();
+	}
+
+	void Packet::GetLine(RString& line) const
+	{
+		_impl->GetLine(line);
+	}
+
+	bool Packet::IsClear()
+	{
+		return _impl->IsClear();
 	}
 }
 

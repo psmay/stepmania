@@ -1,7 +1,8 @@
-#ifndef SEXTETSTREAM_IO_PACKETREADER
-#define SEXTETSTREAM_IO_PACKETREADER
+#ifndef SextetStream_IO_PacketReader_h
+#define SextetStream_IO_PacketReader_h
 
 #include "global.h"
+#include "SextetStream/Packet.h"
 
 namespace SextetStream
 {
@@ -47,7 +48,7 @@ namespace SextetStream
 				// often. Closing the far side of the connection will also
 				// end the blocking, but this is only really useful while
 				// closing.
-				virtual bool ReadPacket(RString& packet) = 0;
+				virtual bool ReadPacket(SextetStream::Packet& packet) = 0;
 		};
 	}
 }

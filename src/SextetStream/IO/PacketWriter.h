@@ -2,6 +2,7 @@
 #define SextetStream_IO_PacketWriter_h
 
 #include "global.h"
+#include "SextetStream/Packet.h"
 
 // SextetStream/IO/PacketWriter.h
 namespace SextetStream
@@ -23,7 +24,7 @@ namespace SextetStream
 
 			// Writes the provided packet (and generally also an LF or CRLF,
 			// depending on the intended receiver) to this packet writer.
-			virtual bool WritePacket(const RString& packet) = 0;
+			virtual bool WritePacket(const SextetStream::Packet& packet) = 0;
 		};
 	}
 }

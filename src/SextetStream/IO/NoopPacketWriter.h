@@ -13,7 +13,7 @@ namespace SextetStream
 			NoopPacketWriter();
 			virtual ~NoopPacketWriter();
 			virtual bool IsReady();
-			virtual bool WritePacket(const RString& packet);
+			virtual bool WritePacket(const SextetStream::Packet& packet);
 		};
 	}
 }

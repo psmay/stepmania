@@ -11,9 +11,11 @@
 #include "SextetStream/IO/NoopPacketWriter.h"
 #include "SextetStream/IO/RageFilePacketWriter.h"
 #include "SextetStream/Data.h"
+#include "SextetStream/Packet.h"
 
 using namespace std;
-
+using namespace SextetStream;
+using namespace SextetStream::IO;
 
 
 
@@ -25,19 +27,16 @@ class LightsDriver_SextetStream::Impl
 {
 
 private:
-	RString previousPacket;
-	SextetStream::IO::PacketWriter * writer;
+	Packet previousPacket;
+	PacketWriter * writer;
 
 public:
-	Impl(SextetStream::IO::PacketWriter * writer)
+	Impl(PacketWriter * writer)
 	{
 		if(writer == NULL) {
-			writer = new SextetStream::IO::NoopPacketWriter();
+			writer = new NoopPacketWriter();
 		}
 		this->writer = writer;
-
-		// Clear the last output buffer
-		previousPacket = "";
 	}
 
 	virtual ~Impl()
@@ -55,15 +54,16 @@ public:
 	{
 		// Skip writing if the writer is not available.
 		if(writer->IsReady()) {
-			RString packet = SextetStream::Data::GetLightsStateAsPacket(ls);
+			Packet packet;
+			packet.SetToLightsState(ls);
 
 			// Only write if the message has changed since the last write.
-			if(!SextetStream::Data::RStringSextetsEqual(packet, previousPacket)) {
+			if(!packet.Equals(previousPacket)) {
 				writer->WritePacket(packet);
-				LOG->Info("Packet: %s", packet.c_str());
+				LOG->Info("Packet: %s", packet.GetLine().c_str());
 
 				// Remember last message
-				previousPacket = packet;
+				previousPacket.Copy(packet);
 			}
 		}
 	}
@@ -115,8 +115,8 @@ LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
 	LOG->Info("Creating LightsDriver_SextetStreamToFile");
 	LOG->Flush();
 
-	SextetStream::IO::PacketWriter * writer =
-		SextetStream::IO::RageFilePacketWriter::Create(g_sSextetStreamOutputFilename);
+	PacketWriter * writer =
+		RageFilePacketWriter::Create(g_sSextetStreamOutputFilename);
 
 	if(writer == NULL) {
 		LOG->Warn("Create of packet writer for LightsDriver_SextetStreamToFile failed.");
