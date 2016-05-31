@@ -53,19 +53,15 @@ namespace
 
 			virtual bool ReadPacket(SextetStream::Packet& packet)
 			{
-				LOG->Info("Doing a ReadPacket");
-
 				bool afterFirst = false;
 
 				if(file != NULL) {
 					RString line;
 
 					while(fgets(buffer, BUFFER_SIZE, file) != NULL) {
-						LOG->Info("Reading part of line");
 						afterFirst = true;
 						line += buffer;
 						size_t lineLength = line.length();
-						LOG->Info("Line length now %u", (unsigned)lineLength);
 						if(lineLength > 0) {
 							int lastChar = line[lineLength - 1];
 							if(lastChar == 0xD || lastChar == 0xA) {
@@ -74,7 +70,6 @@ namespace
 						}
 					}
 
-					LOG->Info("Setting packet");
 					packet.SetToLine(line);
 				}
 

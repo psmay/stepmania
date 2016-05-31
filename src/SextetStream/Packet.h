@@ -20,6 +20,7 @@ namespace SextetStream
 		void Clear();
 
 		void Copy(const Packet& packet);
+		Packet& operator=(const Packet& other);
 
 		// Sets this packet to the first span of valid sextet characters
 		// within the string. All characters before the first valid
@@ -34,6 +35,7 @@ namespace SextetStream
 		// Calculates this XOR b, then assigns the result to this
 		// packet.
 		void SetToXor(const Packet& b);
+		Packet& operator^=(const Packet& other);
 
 		// Calculates a XOR b, then assigns the result to this packet.
 		void SetToXor(const Packet& a, const Packet& b);
@@ -47,9 +49,15 @@ namespace SextetStream
 		void ProcessEventData(const Packet& eventData, size_t bitCount,
 							  void * context, ProcessEventCallback callback) const;
 
+		// Iterates over the low `bitCount` bits of this packet, calling the
+		// callback with the index and value of each.
+		void ProcessEachBit(size_t bitCount, void * context,
+				ProcessEventCallback callback) const;
+
 		// Gets whether this packet is equal to another packet if all
 		// `0` bits are trimmed off the right of both.
 		bool Equals(const Packet& b) const;
+		bool operator==(const Packet& other) const;
 
 		RString GetLine() const;
 		void GetLine(RString& line) const;
@@ -64,6 +72,8 @@ namespace SextetStream
 		class Impl;
 		Impl * _impl;
 	};
+
+	Packet operator^(const Packet& a, const Packet& b);
 }
 
 #endif

@@ -62,15 +62,15 @@ namespace
 class InputHandler_SextetStream::Impl
 {
 private:
-	Packet previousStatePacket;
+	Packet currentStatePacket, nextStatePacket;
 	InputHandler_SextetStream * handler;
 	PacketReaderEventGenerator * eventGenerator;
 	InputDevice id;
-	RageTimer now;
+	RageMutex statePacketsLock;
 
-	static void TriggerUpdateButton(void * p, size_t index, bool value)
+	static void TriggerSetButtonState(void * p, size_t index, bool value)
 	{
-		((Impl*)p)->UpdateButton(index, value);
+		((Impl*)p)->SetButtonState(index, value);
 	}
 
 	static void TriggerOnReadPacket(void * p, const Packet& packet)
@@ -78,43 +78,55 @@ private:
 		((Impl*)p)->OnReadPacket(packet);
 	}
 
-	void UpdateButton(size_t index, bool value)
+	void SetButtonState(size_t index, bool value)
 	{
-		DeviceInput di = DeviceInput(id, ButtonAtIndex(index), value, now);
+		DeviceInput di = DeviceInput(id, ButtonAtIndex(index), value ? 1 : 0);
 		handler->ButtonPressed(di);
 	}
 
 	void OnReadPacket(const Packet& newStatePacket)
 	{
-		LOG->Info("OnReadPacket got a state packet len %u", (unsigned) newStatePacket.SextetCount());
-		Packet packetChanges = newStatePacket;
-		packetChanges.SetToXor(previousStatePacket);
-
-		// Update state
-		previousStatePacket.Copy(newStatePacket);
-
-		// Update device input states
-		id = InputDevice(FIRST_DEVICE);
-		now = RageTimer();
-
-		// Trigger button presses
-		newStatePacket.ProcessEventData(packetChanges, BUTTON_COUNT, this, TriggerUpdateButton);
+		statePacketsLock.Lock();
+		nextStatePacket = newStatePacket;
+		statePacketsLock.Unlock();
 	}
 
+	inline void Update0()
+	{
+		Packet changesPacket;
+
+		changesPacket.SetToXor(currentStatePacket, nextStatePacket);
+
+		if(changesPacket.IsClear()) {
+			// No updates needed
+			return;
+		}
+
+		// Trigger button updates
+		nextStatePacket.ProcessEventData(changesPacket, BUTTON_COUNT, this, TriggerSetButtonState);
+
+		// Must be called at end of Update (cargo cult style).
+		handler->InputHandler::UpdateTimer();
+
+		currentStatePacket = nextStatePacket;
+	}
 
 public:
-	Impl(InputHandler_SextetStream * handler, PacketReader * packetReader)
+	Impl(InputHandler_SextetStream * handler, PacketReader * packetReader) :
+		statePacketsLock("InputHandler_SextetStream")
 	{
 		LOG->Info("Number of button states supported by current InputHandler_SextetStream: %u",
 				  (unsigned)BUTTON_COUNT);
 
 		this->handler = handler;
-		
+
 		eventGenerator = PacketReaderEventGenerator::Create(packetReader, (void*) this, TriggerOnReadPacket);
 
 		if(eventGenerator == NULL) {
 			LOG->Warn("Failed to get PacketReader event generator; this input handler is disabled.");
 		}
+
+		id = InputDevice(FIRST_DEVICE);
 	}
 
 	virtual ~Impl()
@@ -123,6 +135,14 @@ public:
 			delete eventGenerator;
 			eventGenerator = NULL;
 		}
+	}
+
+
+	void Update()
+	{
+		statePacketsLock.Lock();
+		Update0();
+		statePacketsLock.Unlock();
 	}
 
 };
@@ -145,6 +165,11 @@ InputHandler_SextetStream::~InputHandler_SextetStream()
 void InputHandler_SextetStream::GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut)
 {
 	vDevicesOut.push_back(InputDeviceInfo(FIRST_DEVICE, "SextetStream"));
+}
+
+void InputHandler_SextetStream::Update()
+{
+	_impl->Update();
 }
 
 // SextetStreamFromFile

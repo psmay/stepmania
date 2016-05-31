@@ -11,11 +11,12 @@ class InputHandler_SextetStream: public InputHandler
 public:
 	InputHandler_SextetStream();
 	virtual ~InputHandler_SextetStream();
-	//virtual void Update();
+	virtual void Update();
 	virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut);
 
 public:
 	class Impl;
+	friend class Impl;
 protected:
 	Impl * _impl;
 };

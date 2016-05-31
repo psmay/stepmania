@@ -163,7 +163,10 @@ namespace
 			for(size_t subIndex = 0; subIndex < turns; ++subIndex) {
 				RChr mask = 1 << subIndex;
 				if(eventSextet & mask) {
-					CallCallback(bitStartIndex + subIndex, (valueSextet & mask) != 0);
+					size_t bitIndex = bitStartIndex + subIndex;
+					int maskedValue = valueSextet & mask;
+					bool bitValue = maskedValue != 0;
+					CallCallback(bitIndex, bitValue);
 				}
 			}
 		}
@@ -171,17 +174,22 @@ namespace
 		void ProcessAll()
 		{
 			size_t eventSextetCount = eventSextets.size();
+			size_t valueSextetCount = valueSextets.size();
 
 			for(size_t sextetIndex = 0, bitStartIndex = 0; sextetIndex < eventSextetCount; ++sextetIndex, bitStartIndex += 6) {
 				RChr eventSextet = eventSextets[sextetIndex];
+
 				if(eventSextet == 0) {
 					// No 1 bits this sextet.
 					continue;
 				}
+
 				size_t turns = smin(6, bitCount - bitStartIndex);
 
+				RChr valueSextet = (sextetIndex < valueSextetCount) ? valueSextets[sextetIndex] : 0;
+
 				if(turns > 0) {
-					ProcessOneSextet(eventSextet, valueSextets[sextetIndex], bitStartIndex, turns);
+					ProcessOneSextet(eventSextet, valueSextet, bitStartIndex, turns);
 				}
 
 				if(turns < 6) {
@@ -213,12 +221,6 @@ namespace
 			ProcessAll();
 		}
 	};
-
-	inline void ProcessEventDataVectors(const RVector& eventSextets, const RVector& valueSextets, size_t bitCount, void * context, ProcessEventCallback callback)
-	{
-		ProcessEventCallbackDispatcher d(eventSextets, valueSextets, bitCount, context, callback);
-		d.RunEvents();
-	}
 
 	// sourceLeft + length must be less than source.length().
 	// result is automatically expanded.
@@ -270,6 +272,12 @@ namespace
 		for(; sourceIt != sourceEnd; ++sourceIt, ++resultIt) {
 			*resultIt = Armored(*sourceIt);
 		}
+	}
+
+	inline void ProcessEventDataVectors(const RVector& eventSextets, const RVector& valueSextets, size_t bitCount, void * context, ProcessEventCallback callback)
+	{
+		ProcessEventCallbackDispatcher d(eventSextets, valueSextets, bitCount, context, callback);
+		d.RunEvents();
 	}
 }
 
@@ -453,6 +461,26 @@ namespace SextetStream
 			ProcessEventDataVectors(eventData._impl->sextets, sextets, bitCount, context, callback);
 		}
 
+		void ProcessEachBit(size_t bitCount, void * context, ProcessEventCallback callback) const
+		{
+			size_t sextetCount = sextets.size();
+			size_t bitIndex = 0;
+
+			for(size_t sextetIndex = 0; sextetIndex < sextetCount; ++sextetIndex) {
+				for(size_t subBitIndex = 0; subBitIndex < 6; ++subBitIndex, ++bitIndex) {
+					if(bitIndex >= bitCount) {
+						return;
+					}
+					callback(context, bitIndex, (sextets[sextetIndex] & (1 << subBitIndex)) != 0);
+				}
+			}
+
+			while(bitIndex < bitCount) {
+				callback(context, bitIndex, false);
+				++bitIndex;
+			}
+		}
+
 		bool Equals(const Packet& b) const
 		{
 			VectorsEqual(sextets, b._impl->sextets);
@@ -520,6 +548,12 @@ namespace SextetStream
 		_impl->Copy(packet);
 	}
 
+	Packet& Packet::operator=(const Packet& other)
+	{
+		Copy(other);
+		return *this;
+	}
+
 	void Packet::SetToLine(const RString& line)
 	{
 		_impl->SetToLine(line);
@@ -535,9 +569,28 @@ namespace SextetStream
 		_impl->SetToXor(b);
 	}
 
+	Packet& Packet::operator^=(const Packet& other)
+	{
+		SetToXor(other);
+		return *this;
+	}
+
 	void Packet::SetToXor(const Packet& a, const Packet& b)
 	{
 		_impl->SetToXor(a, b);
+	}
+
+	// This is a non-member
+	Packet operator^(const Packet& a, const Packet& b)
+	{
+		Packet result;
+		result.SetToXor(a, b);
+		return result;
+	}
+
+	void Packet::ProcessEachBit(size_t bitCount, void * context, ProcessEventCallback callback) const
+	{
+		_impl->ProcessEachBit(bitCount, context, callback);
 	}
 
 	void Packet::ProcessEventData(const Packet& eventData, size_t bitCount, void * context, ProcessEventCallback callback) const
@@ -548,6 +601,11 @@ namespace SextetStream
 	bool Packet::Equals(const Packet& b) const
 	{
 		return _impl->Equals(b);
+	}
+
+	bool Packet::operator==(const Packet& other) const
+	{
+		return Equals(other);
 	}
 
 	RString Packet::GetLine() const
