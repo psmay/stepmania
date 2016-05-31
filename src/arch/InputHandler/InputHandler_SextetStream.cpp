@@ -86,6 +86,7 @@ private:
 
 	void OnReadPacket(const Packet& newStatePacket)
 	{
+		LOG->Info("OnReadPacket got a state packet len %u", (unsigned) newStatePacket.SextetCount());
 		Packet packetChanges = newStatePacket;
 		packetChanges.SetToXor(previousStatePacket);
 

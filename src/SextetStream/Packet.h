@@ -15,6 +15,8 @@ namespace SextetStream
 		Packet(const Packet& packet);
 		~Packet();
 
+		size_t SextetCount() const;
+
 		void Clear();
 
 		void Copy(const Packet& packet);
@@ -52,7 +54,11 @@ namespace SextetStream
 		RString GetLine() const;
 		void GetLine(RString& line) const;
 
-		bool IsClear();
+		// true if the buffer is completely empty.
+		bool IsEmpty() const;
+
+		// true if the buffer contains only (armored) zeroed sextets.
+		bool IsClear() const;
 
 	private:
 		class Impl;

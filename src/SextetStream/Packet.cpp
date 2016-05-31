@@ -12,6 +12,8 @@ typedef SextetStream::Packet::ProcessEventCallback ProcessEventCallback;
 
 namespace
 {
+	void RStringFromRVector(RString& result, size_t resultLeft, const RVector& source, size_t sourceLeft, size_t length);
+
 	inline size_t smax(size_t a, size_t b)
 	{
 		return (a > b) ? a : b;
@@ -115,6 +117,7 @@ namespace
 			if(*it != ARMORED_0) {
 				return false;
 			}
+			it++;
 		}
 		return true;
 	}
@@ -216,6 +219,58 @@ namespace
 		ProcessEventCallbackDispatcher d(eventSextets, valueSextets, bitCount, context, callback);
 		d.RunEvents();
 	}
+
+	// sourceLeft + length must be less than source.length().
+	// result is automatically expanded.
+	void RVectorFromRString(RVector& result, size_t resultLeft, const RString& source, size_t sourceLeft, size_t length)
+	{
+		RString::const_iterator sourceIt, sourceEnd;
+		RVector::iterator resultIt;
+
+		// Expand result if needed
+		size_t resultRight = resultLeft + length;
+		if(resultRight > result.size()) {
+			result.resize(sourceLeft + length, ARMORED_0);
+		}
+
+		sourceIt = source.begin();
+		std::advance(sourceIt, sourceLeft);
+
+		sourceEnd = sourceIt;
+		std::advance(sourceEnd, length);
+
+		resultIt = result.begin();
+
+		for(; sourceIt != sourceEnd; ++sourceIt, ++resultIt) {
+			*resultIt = Armored(*sourceIt);
+		}
+	}
+
+	// sourceLeft + length must be less than source.size().
+	// result is automatically expanded.
+	void RStringFromRVector(RString& result, size_t resultLeft, const RVector& source, size_t sourceLeft, size_t length)
+	{
+		RVector::const_iterator sourceIt, sourceEnd;
+		RString::iterator resultIt;
+
+		// Expand result if needed
+		size_t resultRight = resultLeft + length;
+		if(resultRight > result.length()) {
+			result.resize(sourceLeft + length, ARMORED_0);
+		}
+
+		sourceIt = source.begin();
+		std::advance(sourceIt, sourceLeft);
+
+		sourceEnd = sourceIt;
+		std::advance(sourceEnd, length);
+
+		resultIt = result.begin();
+
+		for(; sourceIt != sourceEnd; ++sourceIt, ++resultIt) {
+			*resultIt = Armored(*sourceIt);
+		}
+	}
 }
 
 namespace SextetStream
@@ -228,20 +283,7 @@ namespace SextetStream
 		void SetToSextetDataLine(const RString& line, size_t left, size_t right)
 		{
 			size_t length = right - left;
-
-			sextets.resize(length);
-
-			RString::const_iterator stringIt = line.begin();
-			std::advance(stringIt, left);
-
-			RString::const_iterator stringEnd = stringIt;
-			std::advance(stringEnd, length);
-
-			RVector::iterator vectorIt = sextets.begin();
-
-			for(; stringIt != stringEnd; ++stringIt, ++vectorIt) {
-				*vectorIt = Armored(*stringIt);
-			}
+			RVectorFromRString(sextets, 0, line, left, length);
 		}
 
 	public:
@@ -250,6 +292,11 @@ namespace SextetStream
 		}
 
 		~Impl() {}
+
+		size_t SextetCount() const
+		{
+			return sextets.size();
+		}
 
 		void Clear()
 		{
@@ -272,29 +319,32 @@ namespace SextetStream
 		{
 			size_t bitCount = bits.size();
 			size_t sextetCount = (bitCount + 5) / 6;
-			
-			sextets.resize(sextetCount, ARMORED_0);	
+
+			sextets.resize(sextetCount, ARMORED_0);
 
 			size_t sextetIndex = 0;
 			size_t bitIndex = 0;
-			while(bitCount < bitIndex) {
+			while(bitIndex < bitCount) {
 				RChr s = 0;
 				size_t bitsUsed = smin(bitCount - bitIndex, 6);
+
+				
+
 				switch(bitsUsed) {
-					case 6:
-						s |= (bits[bitIndex + 5] ? 0x20 : 0);
-					case 5:
-						s |= (bits[bitIndex + 4] ? 0x10 : 0);
-					case 4:
-						s |= (bits[bitIndex + 3] ? 0x08 : 0);
-					case 3:
-						s |= (bits[bitIndex + 2] ? 0x04 : 0);
-					case 2:
-						s |= (bits[bitIndex + 1] ? 0x02 : 0);
-					case 1:
-						s |= (bits[bitIndex + 0] ? 0x01 : 0);
-					case 0:
-						break;
+				case 6:
+					s |= (bits[bitIndex + 5] ? 0x20 : 0);
+				case 5:
+					s |= (bits[bitIndex + 4] ? 0x10 : 0);
+				case 4:
+					s |= (bits[bitIndex + 3] ? 0x08 : 0);
+				case 3:
+					s |= (bits[bitIndex + 2] ? 0x04 : 0);
+				case 2:
+					s |= (bits[bitIndex + 1] ? 0x02 : 0);
+				case 1:
+					s |= (bits[bitIndex + 0] ? 0x01 : 0);
+				case 0:
+					break;
 				}
 
 				sextets[sextetIndex] = Armored(s);
@@ -379,6 +429,12 @@ namespace SextetStream
 				PUSH0();
 			}
 
+			RString bs;
+			for(size_t bi; bi < bits.size(); ++bi) {
+				bs += (bits[bi] ? "1" : "0");
+			}
+
+			LOG->Info("Packing light bits %s", bs.c_str());
 			SetToBitVector(bits);
 		}
 
@@ -404,7 +460,7 @@ namespace SextetStream
 
 		void GetLine(RString& line)
 		{
-			// TODO
+			RStringFromRVector(line, 0, sextets, 0, sextets.size());
 		}
 
 		RString GetLine()
@@ -414,10 +470,22 @@ namespace SextetStream
 			return line;
 		}
 
-		bool IsClear()
+		bool IsEmpty() const
 		{
-			// TODO
-			return false;
+			return sextets.size() == 0;
+		}
+
+		bool IsClear() const
+		{
+			RVector::const_iterator it = sextets.begin();
+			RVector::const_iterator end = sextets.end();
+
+			for(; it != end; ++it) {
+				if(*it != ARMORED_0) {
+					return false;
+				}
+			}
+			return true;
 		}
 	};
 
@@ -435,6 +503,11 @@ namespace SextetStream
 	Packet::~Packet()
 	{
 		delete _impl;
+	}
+
+	size_t Packet::SextetCount() const
+	{
+		return _impl->SextetCount();
 	}
 
 	void Packet::Clear()
@@ -487,7 +560,12 @@ namespace SextetStream
 		_impl->GetLine(line);
 	}
 
-	bool Packet::IsClear()
+	bool Packet::IsEmpty() const
+	{
+		return _impl->IsEmpty();
+	}
+
+	bool Packet::IsClear() const
 	{
 		return _impl->IsClear();
 	}

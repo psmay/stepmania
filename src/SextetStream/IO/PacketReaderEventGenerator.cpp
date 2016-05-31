@@ -56,22 +56,27 @@ namespace
 			{
 				threadStarted = true;
 
-				LOG->Trace("SextetStream PacketReaderEventGenerator thread started");
+				LOG->Info("SextetStream PacketReaderEventGenerator thread started");
 				
 				while(continueThread) {
 					SextetStream::Packet packet;
 
-					LOG->Trace("Reading packet");
+					LOG->Info("Reading packet");
 
 					if(packetReader->ReadPacket(packet)) {
-						LOG->Trace("Got packet: '%s'", packet.GetLine().c_str());
-						if(!packet.IsClear()) {
+						LOG->Info("Got packet: '%s'", packet.GetLine().c_str());
+						if(packet.IsEmpty()) {
+							LOG->Info("Packet was blank; not calling callback");
+							LOG->Info("Packet's length: %u", (unsigned) packet.SextetCount());
+						}
+						else {
+							LOG->Info("Calling callback");
 							CallOnReadPacket(packet);
 						}
 					}
 					else {
 						// Error or EOF
-						LOG->Trace("SextetStream PacketReader input ended");
+						LOG->Info("SextetStream PacketReader input ended");
 						continueThread = false;
 					}
 				}

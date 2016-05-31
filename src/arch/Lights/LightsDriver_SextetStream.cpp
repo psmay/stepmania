@@ -52,6 +52,8 @@ public:
 
 	void Set(const LightsState * ls)
 	{
+		LOG->Info("Called Set");
+
 		// Skip writing if the writer is not available.
 		if(writer->IsReady()) {
 			Packet packet;
@@ -59,6 +61,7 @@ public:
 
 			// Only write if the message has changed since the last write.
 			if(!packet.Equals(previousPacket)) {
+				LOG->Info("New packet is different than previous");
 				writer->WritePacket(packet);
 				LOG->Info("Packet: %s", packet.GetLine().c_str());
 
