@@ -13,13 +13,11 @@ namespace
 	public:
 		PwImpl(RageFile * stream)
 		{
-			LOG->Info("RageFilePacketWriter impl ctor");
 			out = stream;
 		}
 
 		~PwImpl()
 		{
-			LOG->Info("RageFilePacketWriter impl dtor");
 			if(out != NULL) {
 				out->Flush();
 				out->Close();
@@ -34,7 +32,6 @@ namespace
 
 		bool WritePacket(const SextetStream::Packet& packet)
 		{
-			LOG->Info("RageFilePacketWriter impl WritePacket");
 			if(out != NULL) {
 				RString line = packet.GetLine();
 				out->PutLine(line);

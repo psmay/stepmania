@@ -367,7 +367,8 @@ namespace SextetStream
 				// Each controller takes 6 sextets, which is 36 bits.
 				toReserve += (6 * 6);
 			}
-			bits.resize(toReserve, false);
+			bits.clear();
+			bits.reserve(toReserve);
 
 			// cabinet lights
 			bitArray = ls->m_bCabinetLights;
@@ -434,7 +435,6 @@ namespace SextetStream
 				bs += (bits[bi] ? "1" : "0");
 			}
 
-			LOG->Info("Packing light bits %s", bs.c_str());
 			SetToBitVector(bits);
 		}
 

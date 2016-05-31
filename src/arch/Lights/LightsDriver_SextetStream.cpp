@@ -44,16 +44,11 @@ public:
 		if(writer != NULL) {
 			delete writer;
 			writer = NULL;
-
-			LOG->Info("Deleted writer");
-			LOG->Flush();
 		}
 	}
 
 	void Set(const LightsState * ls)
 	{
-		LOG->Info("Called Set");
-
 		// Skip writing if the writer is not available.
 		if(writer->IsReady()) {
 			Packet packet;
@@ -61,9 +56,8 @@ public:
 
 			// Only write if the message has changed since the last write.
 			if(!packet.Equals(previousPacket)) {
-				LOG->Info("New packet is different than previous");
 				writer->WritePacket(packet);
-				LOG->Info("Packet: %s", packet.GetLine().c_str());
+				LOG->Trace("Packet: %s", packet.GetLine().c_str());
 
 				// Remember last message
 				previousPacket.Copy(packet);
@@ -79,20 +73,13 @@ public:
 
 LightsDriver_SextetStream::LightsDriver_SextetStream()
 {
-	LOG->Info("Starting a SextetStream lights driver");
 	_impl = NULL;
 }
 
 LightsDriver_SextetStream::~LightsDriver_SextetStream()
 {
-	LOG->Info("Destroying a SextetStream lights driver");
-	LOG->Flush();
 	if(_impl != NULL) {
-		LOG->Info("Deleting an implementation");
-		LOG->Flush();
 		delete _impl;
-		LOG->Info("Deleted implementation");
-		LOG->Flush();
 	}
 }
 
