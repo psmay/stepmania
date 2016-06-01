@@ -1,20 +1,19 @@
-#ifndef SEXTETSTREAM_IO_STDCFILEPACKETREADER
-#define SEXTETSTREAM_IO_STDCFILEPACKETREADER
+#ifndef Sextets_IO_NoopPacketWriter_h
+#define Sextets_IO_NoopPacketWriter_h
 
-#include "SextetStream/IO/PacketReader.h"
-#include <cstdio>
+#include "Sextets/IO/PacketWriter.h"
 
-namespace SextetStream
+namespace Sextets
 {
 	namespace IO
 	{
-		// PacketReader implementation using std::FILE from <cstdio>
-		class StdCFilePacketReader : public PacketReader
+		class NoopPacketWriter : public PacketWriter
 		{
-			public:
-				virtual ~StdCFilePacketReader();
-				static StdCFilePacketReader* Create(std::FILE * file);
-				static StdCFilePacketReader* Create(const RString& filename);
+		public:
+			NoopPacketWriter();
+			virtual ~NoopPacketWriter();
+			virtual bool IsReady();
+			virtual bool WritePacket(const Packet& packet);
 		};
 	}
 }
@@ -22,7 +21,7 @@ namespace SextetStream
 #endif
 
 /*
- * Copyright © 2016 Peter S. May
+ * Copyright © 2014-2016 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the

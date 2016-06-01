@@ -4,7 +4,7 @@
 #include "InputHandler.h"
 #include <cstdio>
 
-#include "SextetStream/IO/PacketReaderEventGenerator.h"
+#include "Sextets/IO/PacketReaderEventGenerator.h"
 
 class InputHandler_SextetStream: public InputHandler
 {

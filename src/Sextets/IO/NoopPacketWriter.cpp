@@ -1,36 +1,31 @@
-#ifndef SextetStream_IO_RageFilePacketWriter_h
-#define SextetStream_IO_RageFilePacketWriter_h
 
-#include "SextetStream/IO/PacketWriter.h"
-#include "RageFile.h"
+#include "Sextets/IO/NoopPacketWriter.h"
+#include "RageLog.h"
 
-// SextetStream/IO/RageFilePacketWriter.h
-namespace SextetStream
+namespace Sextets
 {
 	namespace IO
 	{
-		class RageFilePacketWriter : public PacketWriter
+		NoopPacketWriter::NoopPacketWriter()
 		{
-		public:
-			virtual ~RageFilePacketWriter();
-
-			// Note: If there is a problem opening the file, returns
-			// NULL.
-			static RageFilePacketWriter * Create(const RString& filename);
-
-			// Note: If `stream` is `NULL`, returns `NULL`.
-			// When using this method, the RageFile should have been
-			// opened with the modes
-			// `RageFile::WRITE|RageFile::STREAMED` set. (This is not
-			// checked.) Additionally, the provided RageFile will be
-			// properly closed, flushed, and deleted when this packet
-			// writer is deleted.
-			static RageFilePacketWriter * Create(RageFile * stream);
-		};
+			LOG->Info("NoopPacketWriter ctor");
+			LOG->Flush();
+		}
+		NoopPacketWriter::~NoopPacketWriter()
+		{
+			LOG->Info("NoopPacketWriter dtor");
+			LOG->Flush();
+		}
+		bool NoopPacketWriter::IsReady()
+		{
+			return false;
+		}
+		bool NoopPacketWriter::WritePacket(const Packet& packet)
+		{
+			return false;
+		}
 	}
 }
-
-#endif
 
 /*
  * Copyright © 2014-2016 Peter S. May

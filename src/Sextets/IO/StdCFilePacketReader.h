@@ -1,34 +1,28 @@
+#ifndef Sextets_IO_StdCFilePacketReader_h
+#define Sextets_IO_StdCFilePacketReader_h
 
-#include "SextetStream/IO/NoopPacketWriter.h"
-#include "RageLog.h"
+#include "Sextets/IO/PacketReader.h"
+#include <cstdio>
 
-namespace SextetStream
+namespace Sextets
 {
 	namespace IO
 	{
-		NoopPacketWriter::NoopPacketWriter()
+		// PacketReader implementation using std::FILE from <cstdio>
+		class StdCFilePacketReader : public PacketReader
 		{
-			LOG->Info("NoopPacketWriter ctor");
-			LOG->Flush();
-		}
-		NoopPacketWriter::~NoopPacketWriter()
-		{
-			LOG->Info("NoopPacketWriter dtor");
-			LOG->Flush();
-		}
-		bool NoopPacketWriter::IsReady()
-		{
-			return false;
-		}
-		bool NoopPacketWriter::WritePacket(const SextetStream::Packet& packet)
-		{
-			return false;
-		}
+			public:
+				virtual ~StdCFilePacketReader();
+				static StdCFilePacketReader* Create(std::FILE * file);
+				static StdCFilePacketReader* Create(const RString& filename);
+		};
 	}
 }
 
+#endif
+
 /*
- * Copyright © 2014-2016 Peter S. May
+ * Copyright © 2016 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the

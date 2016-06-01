@@ -1,30 +1,30 @@
-#ifndef SextetStream_IO_PacketWriter_h
-#define SextetStream_IO_PacketWriter_h
+#ifndef Sextets_IO_RageFilePacketWriter_h
+#define Sextets_IO_RageFilePacketWriter_h
 
-#include "global.h"
-#include "SextetStream/Packet.h"
+#include "Sextets/IO/PacketWriter.h"
+#include "RageFile.h"
 
-// SextetStream/IO/PacketWriter.h
-namespace SextetStream
+namespace Sextets
 {
 	namespace IO
 	{
-		class PacketWriter
+		class RageFilePacketWriter : public PacketWriter
 		{
 		public:
-			PacketWriter()
-			{
-			}
-			virtual ~PacketWriter()
-			{
-			}
+			virtual ~RageFilePacketWriter();
 
-			// Returns whether this stream can currently write.
-			virtual bool IsReady() = 0;
+			// Note: If there is a problem opening the file, returns
+			// NULL.
+			static RageFilePacketWriter * Create(const RString& filename);
 
-			// Writes the provided packet (and generally also an LF or CRLF,
-			// depending on the intended receiver) to this packet writer.
-			virtual bool WritePacket(const SextetStream::Packet& packet) = 0;
+			// Note: If `stream` is `NULL`, returns `NULL`.
+			// When using this method, the RageFile should have been
+			// opened with the modes
+			// `RageFile::WRITE|RageFile::STREAMED` set. (This is not
+			// checked.) Additionally, the provided RageFile will be
+			// properly closed, flushed, and deleted when this packet
+			// writer is deleted.
+			static RageFilePacketWriter * Create(RageFile * stream);
 		};
 	}
 }

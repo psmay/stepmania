@@ -1,11 +1,12 @@
 
-#include "SextetStream/IO/PacketReaderEventGenerator.h"
+#include "Sextets/IO/PacketReaderEventGenerator.h"
 #include "RageThreads.h"
 #include "RageLog.h"
 
 namespace
 {
-	using namespace SextetStream::IO;
+	using namespace Sextets;
+	using namespace Sextets::IO;
 
 	class PacketReaderEventGeneratorImpl : public PacketReaderEventGenerator
 	{
@@ -18,7 +19,7 @@ namespace
 			volatile bool threadEnded;
 			RageThread thread;
 
-			inline void CallOnReadPacket(const SextetStream::Packet& packet)
+			inline void CallOnReadPacket(const Packet& packet)
 			{
 				onReadPacket(context, packet);
 			}
@@ -26,7 +27,7 @@ namespace
 			inline void CreateThread()
 			{
 				continueThread = true;
-				thread.SetName("SextetStream PacketReaderEventGenerator thread");
+				thread.SetName("Sextets PacketReaderEventGenerator thread");
 				thread.Create(StartThread, this);
 			}
 
@@ -38,7 +39,7 @@ namespace
 
 			void Invalidate()
 			{
-				LOG->Trace("Disposing SextetStream PacketReaderEventGenerator");
+				LOG->Trace("Disposing Sextets PacketReaderEventGenerator");
 
 				if(packetReader != NULL) {
 					LOG->Trace("Deleting packet reader");
@@ -56,10 +57,10 @@ namespace
 			{
 				threadStarted = true;
 
-				LOG->Info("SextetStream PacketReaderEventGenerator thread started");
+				LOG->Info("Sextets PacketReaderEventGenerator thread started");
 				
 				while(continueThread) {
-					SextetStream::Packet packet;
+					Packet packet;
 
 					LOG->Trace("Reading packet");
 
@@ -76,12 +77,12 @@ namespace
 					}
 					else {
 						// Error or EOF
-						LOG->Info("SextetStream PacketReader input ended");
+						LOG->Info("Sextets PacketReader input ended");
 						continueThread = false;
 					}
 				}
 
-				LOG->Info("SextetStream PacketReaderEventGenerator thread ending");
+				LOG->Info("Sextets PacketReaderEventGenerator thread ending");
 				Invalidate();
 
 				threadEnded = true;
@@ -131,7 +132,7 @@ namespace
 	};
 }
 
-namespace SextetStream
+namespace Sextets
 {
 	namespace IO
 	{

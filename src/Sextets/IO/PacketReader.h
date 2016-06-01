@@ -1,15 +1,15 @@
-#ifndef SextetStream_IO_PacketReader_h
-#define SextetStream_IO_PacketReader_h
+#ifndef Sextets_IO_PacketReader_h
+#define Sextets_IO_PacketReader_h
 
 #include "global.h"
-#include "SextetStream/Packet.h"
+#include "Sextets/Packet.h"
 
-namespace SextetStream
+namespace Sextets
 {
 	namespace IO
 	{
 		// Interface for classes that implement the PacketReader protocol
-		// for SextetStream.
+		// for Sextets.
 		class PacketReader
 		{
 			public:
@@ -48,7 +48,7 @@ namespace SextetStream
 				// often. Closing the far side of the connection will also
 				// end the blocking, but this is only really useful while
 				// closing.
-				virtual bool ReadPacket(SextetStream::Packet& packet) = 0;
+				virtual bool ReadPacket(Packet& packet) = 0;
 		};
 	}
 }

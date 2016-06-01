@@ -1,5 +1,5 @@
 
-#include "SextetStream/Packet.h"
+#include "Sextets/Packet.h"
 #include "RageLog.h"
 #include "global.h"
 #include "LightsManager.h"
@@ -8,7 +8,7 @@
 
 typedef RString::value_type RChr;
 typedef std::vector<RChr> RVector;
-typedef SextetStream::Packet::ProcessEventCallback ProcessEventCallback;
+typedef Sextets::Packet::ProcessEventCallback ProcessEventCallback;
 
 namespace
 {
@@ -281,7 +281,7 @@ namespace
 	}
 }
 
-namespace SextetStream
+namespace Sextets
 {
 	class Packet::Impl
 	{

@@ -1,11 +1,14 @@
 
-#include "SextetStream/IO/StdCFilePacketReader.h"
+#include "Sextets/IO/StdCFilePacketReader.h"
 #include "RageLog.h"
 #include <cerrno>
 
 namespace
 {
-	class Impl: public SextetStream::IO::StdCFilePacketReader
+	using namespace Sextets;
+	using namespace Sextets::IO;
+
+	class Impl: public StdCFilePacketReader
 	{
 		private:
 			// The buffer size isn't critical; the RString will simply be
@@ -18,13 +21,13 @@ namespace
 		public:
 			Impl(std::FILE * file)
 			{
-				LOG->Info("Starting InputHandler_SextetStreamFromFile from open std::FILE");
+				LOG->Info("Starting Sextets packet reader from open std::FILE");
 				this->file = file;
 			}
 
 			Impl(const RString& filename)
 			{
-				LOG->Info("Starting InputHandler_SextetStreamFromFile from std::FILE with filename '%s'",
+				LOG->Info("Starting Sextets packet reader from std::FILE with filename '%s'",
 					filename.c_str());
 				file = std::fopen(filename.c_str(), "rb");
 
@@ -51,7 +54,7 @@ namespace
 				return file != NULL;
 			}
 
-			virtual bool ReadPacket(SextetStream::Packet& packet)
+			virtual bool ReadPacket(Packet& packet)
 			{
 				bool afterFirst = false;
 
@@ -78,7 +81,7 @@ namespace
 	};
 }
 
-namespace SextetStream
+namespace Sextets
 {
 	namespace IO
 	{

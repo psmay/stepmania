@@ -5,17 +5,17 @@
 #include "RageThreads.h"
 #include "RageUtil.h"
 
-#include "SextetStream/IO/PacketReader.h"
-#include "SextetStream/IO/StdCFilePacketReader.h"
-#include "SextetStream/Data.h"
+#include "Sextets/IO/PacketReader.h"
+#include "Sextets/IO/StdCFilePacketReader.h"
+#include "Sextets/Data.h"
 
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
 
 using namespace std;
-using namespace SextetStream;
-using namespace SextetStream::IO;
+using namespace Sextets/;
+using namespace Sextets/::IO;
 
 // In so many words, ceil(n/6).
 #define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)

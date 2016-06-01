@@ -1,12 +1,12 @@
-#ifndef SextetStream_Packet_h
-#define SextetStream_Packet_h
+#ifndef Sextets_Packet_h
+#define Sextets_Packet_h
 
 #include "global.h"
 
 // Needed for GetLightsStateAsPacket
 struct LightsState;
 
-namespace SextetStream
+namespace Sextets
 {
 	class Packet
 	{

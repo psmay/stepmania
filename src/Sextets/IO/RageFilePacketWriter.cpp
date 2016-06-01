@@ -1,11 +1,14 @@
 
-#include "SextetStream/IO/RageFilePacketWriter.h"
+#include "Sextets/IO/RageFilePacketWriter.h"
 #include "RageLog.h"
 #include "RageUtil.h"
 
 namespace
 {
-	class PwImpl : public SextetStream::IO::RageFilePacketWriter
+	using namespace Sextets;
+	using namespace Sextets::IO;
+
+	class PwImpl : public RageFilePacketWriter
 	{
 	private:
 		RageFile * out;
@@ -30,7 +33,7 @@ namespace
 			return out != NULL;
 		}
 
-		bool WritePacket(const SextetStream::Packet& packet)
+		bool WritePacket(const Packet& packet)
 		{
 			if(out != NULL) {
 				RString line = packet.GetLine();
@@ -41,7 +44,7 @@ namespace
 	};
 }
 
-namespace SextetStream
+namespace Sextets
 {
 	namespace IO
 	{

@@ -7,15 +7,15 @@
 #include <cstring>
 #include <string>
 
-#include "SextetStream/IO/PacketWriter.h"
-#include "SextetStream/IO/NoopPacketWriter.h"
-#include "SextetStream/IO/RageFilePacketWriter.h"
-#include "SextetStream/Data.h"
-#include "SextetStream/Packet.h"
+#include "Sextets/IO/PacketWriter.h"
+#include "Sextets/IO/NoopPacketWriter.h"
+#include "Sextets/IO/RageFilePacketWriter.h"
+#include "Sextets/Data.h"
+#include "Sextets/Packet.h"
 
 using namespace std;
-using namespace SextetStream;
-using namespace SextetStream::IO;
+using namespace Sextets;
+using namespace Sextets::IO;
 
 
 

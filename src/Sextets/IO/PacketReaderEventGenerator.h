@@ -1,9 +1,9 @@
-#ifndef SEXTETSTREAM_IO_PACKETREADEREVENTGENERATOR
-#define SEXTETSTREAM_IO_PACKETREADEREVENTGENERATOR
+#ifndef Sextets_IO_PacketReaderEventGenerator_h
+#define Sextets_IO_PacketReaderEventGenerator_h
 
-#include "SextetStream/IO/PacketReader.h"
+#include "Sextets/IO/PacketReader.h"
 
-namespace SextetStream
+namespace Sextets
 {
 	namespace IO
 	{
@@ -13,7 +13,7 @@ namespace SextetStream
 		class PacketReaderEventGenerator
 		{
 			public:
-				typedef void PacketReaderEventCallback(void * context, const SextetStream::Packet& packet);
+				typedef void PacketReaderEventCallback(void * context, const Packet& packet);
 
 				// Creates a new PacketReaderEventGenerator with the given
 				// parameters. packetReader and onChange must be specified;

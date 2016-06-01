@@ -1,5 +1,5 @@
 
-#include "SextetStream/Data.h"
+#include "Sextets/Data.h"
 #include "RageLog.h"
 #include "LightsManager.h"
 
@@ -255,7 +255,7 @@ namespace
 		}
 }
 
-namespace SextetStream
+namespace Sextets
 {
 	namespace Data
 	{

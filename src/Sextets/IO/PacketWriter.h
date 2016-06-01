@@ -1,19 +1,30 @@
-#ifndef SextetStream_IO_NoopPacketWriter_h
-#define SextetStream_IO_NoopPacketWriter_h
+#ifndef Sextets_IO_PacketWriter_h
+#define Sextets_IO_PacketWriter_h
 
-#include "SextetStream/IO/PacketWriter.h"
+#include "global.h"
+#include "Sextets/Packet.h"
 
-namespace SextetStream
+// Sextets/IO/PacketWriter.h
+namespace Sextets
 {
 	namespace IO
 	{
-		class NoopPacketWriter : public PacketWriter
+		class PacketWriter
 		{
 		public:
-			NoopPacketWriter();
-			virtual ~NoopPacketWriter();
-			virtual bool IsReady();
-			virtual bool WritePacket(const SextetStream::Packet& packet);
+			PacketWriter()
+			{
+			}
+			virtual ~PacketWriter()
+			{
+			}
+
+			// Returns whether this stream can currently write.
+			virtual bool IsReady() = 0;
+
+			// Writes the provided packet (and generally also an LF or CRLF,
+			// depending on the intended receiver) to this packet writer.
+			virtual bool WritePacket(const Packet& packet) = 0;
 		};
 	}
 }
