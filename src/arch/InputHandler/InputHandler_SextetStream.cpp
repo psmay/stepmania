@@ -14,8 +14,8 @@
 #include <cstring>
 
 using namespace std;
-using namespace Sextets/;
-using namespace Sextets/::IO;
+using namespace Sextets;
+using namespace Sextets::IO;
 
 // In so many words, ceil(n/6).
 #define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
