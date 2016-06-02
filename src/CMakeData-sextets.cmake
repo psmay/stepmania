@@ -15,6 +15,7 @@ list(APPEND SMDATA_SEXTETS_SRC
   "Sextets/IO/RageFilePacketWriter.cpp"
   "Sextets/IO/StdCFilePacketReader.cpp"
   "Sextets/Packet.cpp"
+  "Sextets/PacketBuffer.cpp"
 )
 list(APPEND SMDATA_SEXTETS_HPP
   "Sextets/Data.h"
@@ -25,5 +26,6 @@ list(APPEND SMDATA_SEXTETS_HPP
   "Sextets/IO/RageFilePacketWriter.h"
   "Sextets/IO/StdCFilePacketReader.h"
   "Sextets/Packet.h"
+  "Sextets/PacketBuffer.h"
 )
 source_group("Sextets Support Library" FILES ${SMDATA_SEXTETS_SRC} ${SMDATA_SEXTETS_HPP})
