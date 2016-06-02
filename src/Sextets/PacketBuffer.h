@@ -19,6 +19,16 @@ namespace Sextets
 		virtual void Add(const RString::value_type * data, size_t length) = 0;
 		virtual void Add(const uint8_t * data, size_t length) = 0;
 
+		// If the input buffer contains an unfinished packet, clear it and
+		// wait for the next newline to resume buffering.
+		virtual void DiscardUnfinished() = 0;
+
+		// Returns whether this buffer may contain data that can be
+		// retrieved from GetPacket(). False positives may be possible in a
+		// future implementation, so be sure to check the value returned by
+		// GetPacket() after it is called.
+		virtual bool HasPacket() = 0;
+
 		// Attempts to retrieve a line from the buffer. Returns true iff a
 		// line is successfully retrieved and converted to a non-empty
 		// packet. Note the returned value from this method; even if the

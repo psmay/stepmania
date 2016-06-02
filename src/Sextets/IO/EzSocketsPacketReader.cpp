@@ -3,9 +3,29 @@
 
 #if !defined(WITHOUT_NETWORKING)
 
+#include "Sextets/PacketBuffer.h"
 #include "ezsockets.h"
 #include "RageLog.h"
-#include "RageThreads.h"
+
+namespace
+{
+	EzSockets * OpenSocket(const RString& host, unsigned short port)
+	{
+		EzSockets * sock = new EzSockets;
+		sock->close();
+		sock->create();
+		sock->blocking = false;
+
+		if(!sock->connect(host, port)) {
+			delete sock;
+			return NULL;
+		}
+
+		return sock;
+	}
+
+	static const unsigned int TIMEOUT_MS = 1000;
+}
 
 namespace
 {
@@ -14,91 +34,125 @@ namespace
 
 	class Impl: public EzSocketsPacketReader
 	{
-		private:
-			// The buffer size isn't critical; the RString will simply be
-			// extended until the packet is done.
-			static const size_t BUFFER_SIZE = 64;
-			char buffer[BUFFER_SIZE];
+	private:
+		// This buffer's size isn't critical since it is only used to
+		// receive data from C APIs. The resulting data is copied
+		// directly into a PacketBuffer; which will simply be extended
+		// as needed.
+		static const size_t BUFFER_SIZE = 64;
+		char buffer[BUFFER_SIZE];
+		PacketBuffer * const pb;
 
-			RageMutex mutex;
-
-			inline void lock() { mutex.Lock(); }
-			inline void unlock() { mutex.Unlock(); }
-
-			EzSockets * volatile sock;
+		EzSockets * sock;
 
 
-			inline bool socketIsConnected() {
-				return (sock != NULL) && (sock->state != EzSockets::skDISCONNECTED);
+		inline bool socketIsConnected()
+		{
+			return (sock != NULL) && (sock->state != EzSockets::skDISCONNECTED);
+		}
+
+		inline bool shouldReadSocket()
+		{
+			return socketIsConnected() && !sock->IsError();
+		}
+
+	protected:
+
+	public:
+		Impl(const RString& host, unsigned short port)
+			: pb(PacketBuffer::Create())
+		{
+			LOG->Info("Sextets packet reader opening EzSockets connection to '%s:%u' for input", host.c_str(), (unsigned)port);
+
+			sock = OpenSocket(host, port);
+
+			if(sock == NULL) {
+				LOG->Warn("Sextets packet reader could not open EzSockets connection to '%s:%u' for input", host.c_str(), (unsigned)port);
+			}
+		}
+
+		bool HasSocket()
+		{
+			return (sock != NULL);
+		}
+
+		void Close()
+		{
+			pb->DiscardUnfinished();
+			if(sock != NULL) {
+				LOG->Info("Sextets packet reader closing EzSockets connection");
+				sock->close();
+				delete sock;
+				sock = NULL;
+			}
+		}
+
+		~Impl()
+		{
+			Close();
+			delete pb;
+		}
+
+		virtual bool IsReady()
+		{
+			return shouldReadSocket() || pb->HasPacket();
+		}
+
+		virtual bool ReadPacket(Packet& packet)
+		{
+			// Ensure there isn't already a line in the packet buffer.
+			// (Even if this object has been closed, there may still be
+			// leftover unused data in the packet buffer.)
+			if(pb->GetPacket(packet)) {
+				// Retrieved a waiting line from the packet buffer
+				return true;
 			}
 
-			inline bool shouldReadSocket() {
-				return socketIsConnected() && !sock->IsError();
+			if(!shouldReadSocket()) {
+				packet.Clear();
+				return false;
 			}
 
-		protected:
+			// sock->DataAvailable() and sock->ReadData() combine
+			// here as a "slightly blocking" read. If there is no
+			// data, it will wait up to timeout ms for data to come
+			// in. If any data has been received, it is then read.
+			// If no data has been received, the read length is 0.
+			// Therefore, this ReadPacket() implementation returns
+			// in a finite (and small) amount of time.
+			size_t readLen = sock->DataAvailable(TIMEOUT_MS) ?
+							 sock->ReadData(buffer, BUFFER_SIZE) :
+							 0;
 
-		public:
-			Impl(EzSockets * sock) : sock(sock)
-			{
-			}
+			if(readLen == 0) {
+				// No read. Could indicate an empty read or a
+				// problem.
 
-			Impl(const RString& host, unsigned short port)
-			{
-				LOG->Info("Starting Sextets packet reader from ezsockets '%s:%u'",
-					host.c_str(), (unsigned)port);
-
-				EzSockets * sock = new 
-				if(file == NULL) {
-					LOG->Warn("Error opening file '%s' for input (cstdio): %s", filename.c_str(),
-						std::strerror(errno));
+				if(shouldReadSocket()) {
+					// Empty + true indicates that a non-blocking read
+					// hasn't received a line yet, but the stream is
+					// still open.
+					packet.Clear();
+					return true;
+				} else {
+					// EOF or unrecoverable error.
+					Close();
+					return false;
 				}
-				else {
-					LOG->Info("File opened");
-					// Disable buffering on the file
-					std::setbuf(file, NULL);
+			} else {
+				// Nonzero read; add to the packet buffer.
+				pb->Add(buffer, readLen);
+				// Now, see if a packet became available due to this
+				// read.
+				if(pb->GetPacket(packet)) {
+					// Retrieved a waiting line from the packet buffer
+					return true;
 				}
 			}
-
-
-			~Impl()
-			{
-				if(file != NULL) {
-					std::fclose(file);
-				}
-			}
-
-			virtual bool IsReady()
-			{
-				return file != NULL;
-			}
-
-			virtual bool ReadPacket(Packet& packet)
-			{
-				bool afterFirst = false;
-
-				if(file != NULL) {
-					RString line;
-
-					while(fgets(buffer, BUFFER_SIZE, file) != NULL) {
-						afterFirst = true;
-						line += buffer;
-						size_t lineLength = line.length();
-						if(lineLength > 0) {
-							int lastChar = line[lineLength - 1];
-							if(lastChar == 0xD || lastChar == 0xA) {
-								break;
-							}
-						}
-					}
-
-					packet.SetToLine(line);
-				}
-
-				return afterFirst;
-			}
+		}
 	};
 }
+
 
 namespace Sextets
 {
@@ -106,22 +160,14 @@ namespace Sextets
 	{
 		EzSocketsPacketReader* EzSocketsPacketReader::Create(const RString& host, unsigned short port)
 		{
-			LOG->Info("Starting Sextets packet reader from ezsockets '%s:%u'", host.c_str(), (unsigned)port);
-
-			EzSockets * sock = new EzSockets;
-			sock->close();
-			sock->create();
-			sock->blocking = false;
-
-			if(!sock->connect(host, port)) {
-				LOG->Warn("Count not connect to %s:%u for input", host.c_str(), (unsigned)port);
-				delete sock;
+			Impl * obj = new Impl(host, port);
+			if(!obj->HasSocket()) {
+				delete obj;
 				return NULL;
 			}
-
-			return new Impl(sock);
+			return obj;
 		}
-		
+
 		EzSocketsPacketReader::~EzSocketsPacketReader() {}
 	}
 }

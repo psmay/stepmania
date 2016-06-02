@@ -6,6 +6,9 @@
 
 #include <vector>
 
+#define PUSH(i) bits.push_back(bitArray[i])
+#define PUSH0() bits.push_back(false)
+
 typedef RString::value_type RChr;
 typedef std::vector<RChr> RVector;
 typedef Sextets::Packet::ProcessEventCallback ProcessEventCallback;
@@ -361,8 +364,6 @@ namespace Sextets
 			}
 		}
 
-#define PUSH(i) bits.push_back(bitArray[i])
-#define PUSH0() bits.push_back(false)
 
 		void SetToLightsState(const LightsState * ls)
 		{
@@ -486,9 +487,39 @@ namespace Sextets
 			VectorsEqual(sextets, b._impl->sextets);
 		}
 
-		void GetLine(RString& line)
+		void GetUntrimmedLine(RString& line)
 		{
 			RStringFromRVector(line, 0, sextets, 0, sextets.size());
+		}
+
+		RString GetUntrimmedLine()
+		{
+			RString line;
+			GetUntrimmedLine(line);
+			return line;
+		}
+
+		void GetLine(RString& line)
+		{
+			GetUntrimmedLine(line);
+
+			// An empty line stays empty.
+			if(line.empty()) {
+				return;
+			}
+
+			// Find the last non-trimmable character.
+			size_t i = line.find_last_not_of(ARMORED_0);
+			if(i == RString::npos) {
+				// There are no non-trimmable characters.
+				// The canonical form of this is a single armored 0.
+				line.replace(0, RString::npos, 1, ARMORED_0);
+			}
+			else {
+				// The first trailing zero character to erase, if any, is at
+				// i + 1.
+				line.erase(i + 1);
+			}
 		}
 
 		RString GetLine()
@@ -498,12 +529,19 @@ namespace Sextets
 			return line;
 		}
 
+		void Trim()
+		{
+			RString line;
+			GetLine(line);
+			SetToSextetDataLine(line, 0, line.length());
+		}
+
 		bool IsEmpty() const
 		{
 			return sextets.size() == 0;
 		}
 
-		bool IsClear() const
+		bool IsZeroed() const
 		{
 			RVector::const_iterator it = sextets.begin();
 			RVector::const_iterator end = sextets.end();
@@ -608,6 +646,16 @@ namespace Sextets
 		return Equals(other);
 	}
 
+	RString Packet::GetUntrimmedLine() const
+	{
+		return _impl->GetUntrimmedLine();
+	}
+
+	void Packet::GetUntrimmedLine(RString& line) const
+	{
+		_impl->GetUntrimmedLine(line);
+	}
+
 	RString Packet::GetLine() const
 	{
 		return _impl->GetLine();
@@ -623,9 +671,9 @@ namespace Sextets
 		return _impl->IsEmpty();
 	}
 
-	bool Packet::IsClear() const
+	bool Packet::IsZeroed() const
 	{
-		return _impl->IsClear();
+		return _impl->IsZeroed();
 	}
 }
 

@@ -36,7 +36,15 @@ public:
 	LightsDriver_SextetStreamToFile();
 };
 
-#endif
+#ifndef WITHOUT_NETWORKING
+class LightsDriver_SextetStreamToSocket : public LightsDriver_SextetStream
+{
+public:
+	LightsDriver_SextetStreamToSocket();
+};
+#endif // WITHOUT_NETWORKING
+
+#endif // H
 
 /*
  * Copyright © 2014-2016 Peter S. May

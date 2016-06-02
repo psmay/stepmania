@@ -40,10 +40,19 @@ public:
 	// passed to fopen(), not a RageFile ctor, so specify the file to be
 	// opened on the actual filesystem instead of the mapped filesystem. (I
 	// couldn't get RageFile to work here, possibly because I haven't
-	// determined how to disable buffering on an input file.) 
+	// determined how to disable buffering on an input file.)
 	InputHandler_SextetStreamFromFile();
 
 };
+
+#ifndef WITHOUT_NETWORKING
+class InputHandler_SextetStreamFromSocket: public InputHandler_SextetStream
+{
+public:
+	virtual ~InputHandler_SextetStreamFromSocket();
+	InputHandler_SextetStreamFromSocket();
+};
+#endif
 
 #endif
 

@@ -183,6 +183,11 @@ namespace
 			BreakBuffer();
 		}
 
+		bool HasPacket()
+		{
+			return !lines.empty();
+		}
+
 		bool GetPacket(Packet& packet)
 		{
 			if(lines.empty()) {
@@ -193,6 +198,11 @@ namespace
 			lines.pop();
 
 			return true;
+		}
+
+		void DiscardUnfinished()
+		{
+			RequestResync();
 		}
 	};
 }

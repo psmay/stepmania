@@ -97,7 +97,7 @@ private:
 
 		changesPacket.SetToXor(currentStatePacket, nextStatePacket);
 
-		if(changesPacket.IsClear()) {
+		if(changesPacket.IsZeroed()) {
 			// No updates needed
 			return;
 		}
@@ -192,6 +192,34 @@ InputHandler_SextetStreamFromFile::~InputHandler_SextetStreamFromFile()
 {
 }
 
+#ifndef WITHOUT_NETWORKING
+
+// SextetStreamFromSocket
+
+#include "ezsockets.h"
+#include "Sextets/IO/EzSocketsPacketReader.h"
+
+REGISTER_INPUT_HANDLER_CLASS(SextetStreamFromSocket);
+
+#define DEFAULT_SOCKET_HOST "localhost"
+#define DEFAULT_SOCKET_PORT 6761
+
+static Preference<RString> g_sSextetStreamInputSocketHost("SextetStreamInputSocketHost", DEFAULT_SOCKET_HOST);
+static Preference<int> g_iSextetStreamInputSocketPort("SextetStreamInputSocketHost", DEFAULT_SOCKET_PORT);
+
+InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket()
+{
+	RString host = g_sSextetStreamInputSocketHost;
+	unsigned short port = (unsigned short) g_iSextetStreamInputSocketPort;
+
+	_impl = new InputHandler_SextetStream::Impl(this, EzSocketsPacketReader::Create(host, port));
+}
+
+InputHandler_SextetStreamFromSocket::~InputHandler_SextetStreamFromSocket()
+{
+}
+
+#endif // ndef WITHOUT_NETWORKING
 
 /*
  * Copyright © 2014-2016 Peter S. May

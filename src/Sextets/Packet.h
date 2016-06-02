@@ -19,6 +19,8 @@ namespace Sextets
 
 		void Clear();
 
+		void Canonicalize();
+
 		void Copy(const Packet& packet);
 		Packet& operator=(const Packet& other);
 
@@ -59,14 +61,31 @@ namespace Sextets
 		bool Equals(const Packet& b) const;
 		bool operator==(const Packet& other) const;
 
+		// Retrieves a line reflecting the state of the current buffer
+		// as-is.
+		RString GetUntrimmedLine() const;
+		void GetUntrimmedLine(RString& line) const;
+
+		// Retrieves a line reflecting the state of the current buffer:
+		//
+		// If IsEmpty(), the result is an empty string ("").
+		//
+		// If IsZeroed() and not IsEmpty(), the result is a single armored
+		// zero ("@").
+		//
+		// Otherwise, the result is the state of the current buffer with all
+		// trailing zeroes removed.
 		RString GetLine() const;
 		void GetLine(RString& line) const;
 
-		// true if the buffer is completely empty.
+		// Replace the buffer with the trimmed form returned by GetLine().
+		void Trim();
+
+		// true if the buffer contains no data.
 		bool IsEmpty() const;
 
 		// true if the buffer contains only (armored) zeroed sextets.
-		bool IsClear() const;
+		bool IsZeroed() const;
 
 	private:
 		class Impl;
