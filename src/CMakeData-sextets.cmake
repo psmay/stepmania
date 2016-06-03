@@ -47,11 +47,9 @@ list(APPEND SMDATA_SEXTETS_HPP
 if(WITH_NETWORKING)
   list(APPEND SMDATA_SEXTETS_SRC
     "Sextets/IO/EzSocketsPacketReader.cpp"
-    "Sextets/IO/EzSocketsPacketWriter.cpp"
   )
   list(APPEND SMDATA_SEXTETS_HPP
     "Sextets/IO/EzSocketsPacketReader.h"
-    "Sextets/IO/EzSocketsPacketWriter.h"
   )
 endif()
 

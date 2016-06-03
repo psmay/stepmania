@@ -118,41 +118,6 @@ LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
 	_impl = new Impl(writer);
 }
 
-#if !defined(WITHOUT_NETWORKING)
-// LightsDriver_SextetStreamToSocket implementation
-
-#include "Sextets/IO/EzSocketsPacketWriter.h"
-
-REGISTER_LIGHTS_DRIVER_CLASS(SextetStreamToSocket);
-
-#define DEFAULT_SOCKET_HOST "localhost"
-#define DEFAULT_SOCKET_PORT 6760
-
-static Preference<RString> g_sSextetStreamOutputHost("SextetStreamOutputHost", DEFAULT_SOCKET_HOST);
-static Preference<int> g_iSextetStreamOutputPort("SextetStreamOutputPort", DEFAULT_SOCKET_PORT);
-
-LightsDriver_SextetStreamToSocket::LightsDriver_SextetStreamToSocket()
-{
-	LOG->Info("Creating LightsDriver_SextetStreamToSocket");
-	LOG->Flush();
-
-	RString host = g_sSextetStreamOutputHost;
-	unsigned short port = (unsigned short) g_iSextetStreamOutputPort;
-
-	PacketWriter * writer =
-		EzSocketsPacketWriter::Create(g_sSextetStreamOutputHost, g_iSextetStreamOutputPort);
-
-	if(writer == NULL) {
-		LOG->Warn("Create of packet writer for LightsDriver_SextetStreamToSocket failed.");
-	} else {
-		LOG->Info("Create of packet writer for LightsDriver_SextetStreamToSocket OK.");
-	}
-
-	// Impl() accounts for the case where writer is NULL.
-	_impl = new Impl(writer);
-}
-#endif // !defined(WITHOUT_NETWORKING)
-
 /*
  * Copyright © 2014-2016 Peter S. May
  *

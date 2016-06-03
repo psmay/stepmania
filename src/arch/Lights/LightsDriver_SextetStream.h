@@ -36,14 +36,6 @@ public:
 	LightsDriver_SextetStreamToFile();
 };
 
-#ifndef WITHOUT_NETWORKING
-class LightsDriver_SextetStreamToSocket : public LightsDriver_SextetStream
-{
-public:
-	LightsDriver_SextetStreamToSocket();
-};
-#endif // WITHOUT_NETWORKING
-
 #endif // H
 
 /*
