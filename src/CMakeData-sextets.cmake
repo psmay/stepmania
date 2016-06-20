@@ -44,6 +44,15 @@ list(APPEND SMDATA_SEXTETS_HPP
   "Sextets/Packet.h"
 )
 
+if(NOT WIN32)
+  list(APPEND SMDATA_SEXTETS_SRC
+    "Sextets/IO/SelectFilePacketReader.cpp"
+  )
+  list(APPEND SMDATA_SEXTETS_HPP
+    "Sextets/IO/SelectFilePacketReader.h"
+  )
+endif()
+
 if(WITH_NETWORKING)
   list(APPEND SMDATA_SEXTETS_SRC
     "Sextets/IO/EzSocketsPacketReader.cpp"

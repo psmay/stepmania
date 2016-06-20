@@ -58,22 +58,21 @@ namespace
 		void RequestResync()
 		{
 			needsResync = true;
-			buffer.clear();
 		}
 
-		// If needsResync, attempts to find and erase through the first
-		// newline character in the buffer. If successful, needsResync is
-		// set to false. Returns whether the buffer is now synced (which is
+		// If needsResync, attempts to find and erase to the first newline
+		// character in the buffer. If successful, needsResync is set to
+		// false. Returns whether the buffer is now synced (which is
 		// !needsResync).
 		bool SyncBuffer()
 		{
 			if(needsResync) {
-				if(EraseToFirstOf(buffer, ASCII_NEWLINE_CHARS, 1)) {
-					// Newline found; erased through newline to sync
+				if(EraseToFirstOf(buffer, ASCII_NEWLINE_CHARS)) {
+					// Newline found; buffer erased up to newline to sync
 					needsResync = false;
 					return true;
 				} else {
-					// No newline
+					// No newline found
 					buffer.clear();
 					return false;
 				}
@@ -92,63 +91,50 @@ namespace
 		void BreakBuffer()
 		{
 			while(!buffer.empty() && SyncBuffer()) {
-				if(EraseToFirstOf(buffer, ASCII_PRINTABLE_CHARS)) {
-					// Removed leading non-printable chars
-				} else {
-					// The whole buffer is non-printable
-					buffer.clear();
-					return;
-				}
 
-				size_t iNewline = buffer.find_first_of(ASCII_NEWLINE_CHARS);
-				size_t iNonPrint = buffer.find_first_not_of(ASCII_PRINTABLE_CHARS);
+				// First newline
+				size_t newlineIndex = buffer.find_first_of(ASCII_NEWLINE_CHARS);
+				// First invalid char
+				size_t invalidIndex = buffer.find_first_not_of(SIMPLE_CHARS);
 
-				// The first non-printable should be the same as the
-				// first newline.
-				if(iNewline != iNonPrint) {
-					// Non-printable, non-newline characters may appear in
-					// the input, but they must not appear on the same line
-					// as a printable character.
+				size_t len = (newlineIndex != RString::npos) ? newlineIndex : buffer.length();
+
+				// An invalid character is seen within the current line's
+				// portion of the buffer.
+				if(invalidIndex != RString::npos && (invalidIndex < len))
+				{
+					// Discard line in progress up to next newline
 					RequestResync();
 					LOG->Warn(
-						"Sextets PacketBuffer encountered a "
-						"non-newline, non-printable character at a "
-						"position where it is not valid. The current "
-						"line has been discarded.");
-
+						"Sextets PacketBuffer encountered a line "
+						"that contains an invalid character. "
+						"The current line will be discarded.");
 					continue;
-				} else {
-					size_t length = (iNewline == RString::npos) ? buffer.length() : iNewline;
-
-					if(length > LINE_MAX_LENGTH) {
-						// Push truncated line (it might actually be larger
-						// than LINE_MAX_LENGTH due to the length not having
-						// been checked until after the input string has
-						// been appended to the buffer)
-						PushLine(buffer.substr(0, LINE_MAX_LENGTH));
-
-						RequestResync();
-						LOG->Warn(
-							"Sextets PacketBuffer encountered a line "
-							"that is longer than the allowed maximum "
-							"length (%d). The current line has been "
-							"truncated.", (unsigned)LINE_MAX_LENGTH);
-
-						continue;
-					}
-
-					if(iNewline == RString::npos) {
-						// No newline yet.
-						// Leave the buffer as-is.
-						return;
-					} else {
-						// A newline character exists before the end of the
-						// buffer.
-						PushLine(buffer.substr(0, iNewline));
-						buffer.erase(0, iNewline + 1);
-						continue;
-					}
 				}
+
+				// The current line's portion of the buffer is too long.
+				if(len > LINE_MAX_LENGTH) {
+					// Take the beginning, then discard the rest of the line
+					PushLine(buffer.substr(0, LINE_MAX_LENGTH));
+							RequestResync();
+							buffer.clear();
+							LOG->Warn(
+								"Sextets PacketBuffer encountered a line "
+								"that is longer than the allowed maximum "
+								"length (%d). The current line has been "
+								"truncated.", (unsigned)LINE_MAX_LENGTH);
+							continue;
+				}
+
+				// The buffer contains a newline and otherwise looks OK.
+				if(newlineIndex != RString::npos) {
+					PushLine(buffer.substr(0, newlineIndex));
+					EraseTo(buffer, newlineIndex, 1);
+					continue;
+				}
+
+				// The buffer doesn't contain a newline.
+				return;
 			}
 		}
 

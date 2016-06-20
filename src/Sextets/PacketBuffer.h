@@ -13,7 +13,7 @@ namespace Sextets
 
 		static PacketBuffer * Create();
 
-		// Adds data to this buffer. Returns true iff the buffer, as of
+		// Adds data to this buffer. Returns true iff the buffer, after
 		// adding the new data, contains at least one newline.
 		virtual void Add(const RString& data) = 0;
 		virtual void Add(const RString::value_type * data, size_t length) = 0;

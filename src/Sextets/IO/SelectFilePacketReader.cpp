@@ -1,30 +1,34 @@
 
-#include "Sextets/IO/EzSocketsPacketReader.h"
+#include "Sextets/IO/SelectFilePacketReader.h"
 
-#if !defined(WITHOUT_NETWORKING)
+// TODO: Determine which of these are actually necessary
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/select.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cstdio>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "Sextets/PacketBuffer.h"
-#include "ezsockets.h"
 #include "RageLog.h"
 
 namespace
 {
-	EzSockets * OpenSocket(const RString& host, unsigned short port)
+	int OpenFd(const RString& filename)
 	{
-		EzSockets * sock = new EzSockets;
-		sock->close();
-		sock->create();
-		sock->blocking = false;
+		int fd = open(filename.c_str(), O_RDONLY | O_NONBLOCK);
 
-		if(!sock->connect(host, port)) {
-			delete sock;
-			return NULL;
+		if(fd < 0) {
+			return -1;
 		}
 
-		return sock;
+		return fd;
 	}
 
-	static const unsigned int TIMEOUT_MS = 1000;
+	// Timeout in ms
+	static const size_t timeout = 1000;
 }
 
 namespace
@@ -32,7 +36,7 @@ namespace
 	using namespace Sextets;
 	using namespace Sextets::IO;
 
-	class Impl: public EzSocketsPacketReader
+	class Impl: public SelectFilePacketReader
 	{
 	private:
 		// This buffer's size isn't critical since it is only used to
@@ -43,62 +47,65 @@ namespace
 		char buffer[BUFFER_SIZE];
 		PacketBuffer * const pb;
 
-		EzSockets * sock;
+		int fd;
+		bool seenEof;
+		bool seenError;
 
-		inline bool shouldReadSocket()
+		inline bool shouldRead()
 		{
-			if(sock == NULL) {
+			if(seenEof) {
+				// EOF
+				return false;
+			}
+			else if(seenError) {
 				LOG->Warn(
-					"Problem with socket: Socket reference is NULL (socket "
-					"may already have been disposed)");
+					"Problem with file: Stream experienced error");
 				return false;
-			} else if(sock->state == EzSockets::skDISCONNECTED) {
-				LOG->Warn("Problem with socket: Socket is disconnected");
-				return false;
-			} else if(sock->IsError()) {
-				LOG->Warn("Problem with socket: Socket has error status");
+			}
+			else if(fd < 0) {
+				LOG->Warn(
+					"Problem with file: Stream is invalid or disposed");
 				return false;
 			}
 			return true;
 		}
 
 	public:
-		Impl(const RString& host, unsigned short port)
+		Impl(const RString& filename)
 			: pb(PacketBuffer::Create())
 		{
 			LOG->Info(
-				"Sextets packet reader opening EzSockets connection to "
-				"'%s:%u' for input", host.c_str(), (unsigned)port);
+				"Sextets packet select()/file reader opening stream from file '%s' for input", filename.c_str());
 
-			sock = OpenSocket(host, port);
+			fd = OpenFd(filename);
+			seenEof = false;
+			seenError = false;
 
-			if(sock == NULL) {
+			if(!HasStream()) {
 				LOG->Warn(
-					"Sextets packet reader could not open EzSockets "
-					"connection to '%s:%u' for input",
-					host.c_str(), (unsigned)port);
+					"Sextets packet select()/file reader could not open stream from file '%s' for input", filename.c_str());
+				return;
 			}
 		}
 
-		bool HasSocket()
+		bool HasStream()
 		{
-			return (sock != NULL);
+			return fd >= 0;
 		}
 
 		void Close()
 		{
 			pb->DiscardUnfinished();
-			if(sock != NULL) {
-				LOG->Info("Sextets packet reader closing EzSockets connection");
-				sock->close();
-				delete sock;
-				sock = NULL;
+			if(HasStream()) {
+				LOG->Info("Sextets packet select()/file reader closing stream");
+				close(fd); // This is close() with a lower-case c
+				fd = -1;
 			}
 		}
 
-		void CloseDueToSocketProblem()
+		void CloseDueToStreamUnreadable()
 		{
-			LOG->Warn("EzSocketsPacketReader: Closing due to socket problem");
+			LOG->Warn("SelectFilePacketReader: Closing because stream can no longer be read");
 			Close();
 		}
 
@@ -110,9 +117,9 @@ namespace
 
 		virtual bool IsReady()
 		{
-			return shouldReadSocket() || pb->HasPacket();
+			return shouldRead() || pb->HasPacket();
 		}
-
+		
 		virtual bool ReadPacket(Packet& packet)
 		{
 			// Ensure there isn't already a line in the packet buffer.
@@ -124,53 +131,85 @@ namespace
 			}
 
 			// No complete line from buffer yet. Can we read more?
-			if(!shouldReadSocket()) {
+			if(!shouldRead()) {
 				// EOF or unrecoverable error.
-				CloseDueToSocketProblem();
+				CloseDueToStreamUnreadable();
 				return false;
 			}
 
 			// Try reading more.
 
-			// sock->DataAvailable() and sock->ReadData() combine
+			// select() and read() on an O_NONBLOCK stream combine
 			// here as a "slightly blocking" read. If there is no
 			// data, it will wait up to timeout ms for data to come
 			// in. If any data has been received, it is then read.
 			// If no data has been received, the read length is 0.
 			// Therefore, this ReadPacket() implementation returns
 			// in a finite (and small) amount of time.
-			size_t readLen = sock->DataAvailable(TIMEOUT_MS) ?
-							 sock->ReadData(buffer, BUFFER_SIZE) :
-							 0;
+			struct timeval timeoutval = { 0, timeout * 1000 };
+			fd_set set;
+			FD_ZERO(&set);
+			FD_SET(fd, &set);
+			int event_count = select(fd + 1, &set, NULL, NULL, &timeoutval);
+
+			size_t readLen = 0;
+
+			if(event_count == 0) {
+				// Timed out
+				readLen = 0;
+			}
+			else if(event_count < 0) {
+				// Select call error
+				LOG->Warn("Problem waiting for input on stream: %s", strerror(errno));
+				seenError = true;
+			}
+			else if(FD_ISSET(fd, &set)) {
+				// Change seen on our stream
+				ssize_t bytes = read(fd, buffer, BUFFER_SIZE);
+
+				if(bytes > 0) {
+					readLen = (size_t) bytes;
+				}
+				else if(bytes == 0) {
+					// EOF
+					seenEof = true;
+				}
+				else if((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
+					// Temporarily no more to read
+					readLen = 0;
+				}
+				else {
+					LOG->Warn("Problem reading input on stream: %s", strerror(errno));
+					seenError = true;
+				}
+			}
+			else {
+				// Nothing to report
+				readLen = 0;
+			}
+
+			if(seenEof || seenError) {
+				CloseDueToStreamUnreadable();
+				return false;
+			}
 
 			if(readLen == 0) {
-				// Nothing read. If the socket is now no longer OK, close.
-				// Otherwise, this has been simply an empty read.
-
-				if(!shouldReadSocket()) {
-					// EOF or unrecoverable error.
-					CloseDueToSocketProblem();
-					return false;
-				}
-
-				// No new data, but socket still healthy.
 				packet.Clear();
-				return true;
-			} else {
+			}
+			else {
 				// Nonzero read; add to the packet buffer.
 				pb->Add(buffer, readLen);
 
 				// Now, see if a packet became available due to this read.
-				if(pb->GetPacket(packet)) {
-					// Retrieved a waiting line from the packet buffer.
-					return true;
-				} else {
+				if(!pb->GetPacket(packet)) {
 					// No full line from buffer, but let the caller know
 					// that there might still be one later.
 					packet.Clear();
-					return true;
 				}
+				// Otherwise, a new packet is in packet.
 			}
+
+			return true;
 		}
 	};
 }
@@ -180,21 +219,14 @@ namespace Sextets
 {
 	namespace IO
 	{
-		EzSocketsPacketReader* EzSocketsPacketReader::Create(const RString& host, unsigned short port)
+		SelectFilePacketReader* SelectFilePacketReader::Create(const RString& filename)
 		{
-			Impl * obj = new Impl(host, port);
-			if(!obj->HasSocket()) {
-				delete obj;
-				return NULL;
-			}
-			return obj;
+			return new Impl(filename);
 		}
-
-		EzSocketsPacketReader::~EzSocketsPacketReader() {}
+		
+		SelectFilePacketReader::~SelectFilePacketReader() {}
 	}
 }
-
-#endif // !defined(WITHOUT_NETWORKING)
 
 /*
  * Copyright © 2016 Peter S. May

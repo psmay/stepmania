@@ -7,6 +7,7 @@
 
 #include "Sextets/IO/PacketReader.h"
 #include "Sextets/IO/StdCFilePacketReader.h"
+#include "Sextets/IO/SelectFilePacketReader.h"
 #include "Sextets/Data.h"
 
 #include <cerrno>
@@ -97,7 +98,7 @@ private:
 
 		changesPacket.SetToXor(currentStatePacket, nextStatePacket);
 
-		if(changesPacket.IsZeroed()) {
+		if(changesPacket.IsEmpty()) {
 			// No updates needed
 			return;
 		}
@@ -192,6 +193,24 @@ InputHandler_SextetStreamFromFile::~InputHandler_SextetStreamFromFile()
 {
 }
 
+
+// SextetStreamFromSelectFile
+
+#if !defined(_WINDOWS)
+
+REGISTER_INPUT_HANDLER_CLASS(SextetStreamFromSelectFile);
+
+InputHandler_SextetStreamFromSelectFile::InputHandler_SextetStreamFromSelectFile()
+{
+	_impl = new InputHandler_SextetStream::Impl(this, SelectFilePacketReader::Create(g_sSextetStreamInputFilename));
+}
+
+InputHandler_SextetStreamFromSelectFile::~InputHandler_SextetStreamFromSelectFile()
+{
+}
+
+#endif
+
 #ifndef WITHOUT_NETWORKING
 
 // SextetStreamFromSocket
@@ -205,7 +224,7 @@ REGISTER_INPUT_HANDLER_CLASS(SextetStreamFromSocket);
 #define DEFAULT_SOCKET_PORT 6761
 
 static Preference<RString> g_sSextetStreamInputSocketHost("SextetStreamInputSocketHost", DEFAULT_SOCKET_HOST);
-static Preference<int> g_iSextetStreamInputSocketPort("SextetStreamInputSocketHost", DEFAULT_SOCKET_PORT);
+static Preference<int> g_iSextetStreamInputSocketPort("SextetStreamInputSocketPort", DEFAULT_SOCKET_PORT);
 
 InputHandler_SextetStreamFromSocket::InputHandler_SextetStreamFromSocket()
 {

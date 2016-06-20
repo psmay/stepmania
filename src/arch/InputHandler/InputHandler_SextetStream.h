@@ -45,14 +45,30 @@ public:
 
 };
 
-#ifndef WITHOUT_NETWORKING
+#if !defined(WITHOUT_NETWORKING)
 class InputHandler_SextetStreamFromSocket: public InputHandler_SextetStream
 {
 public:
 	virtual ~InputHandler_SextetStreamFromSocket();
 	InputHandler_SextetStreamFromSocket();
 };
-#endif
+#endif // !defined(WITHOUT_NETWORKING)
+
+
+#if !defined(WIN32)
+// Only for systems that support select() on ordinary files
+class InputHandler_SextetStreamFromSelectFile: public InputHandler_SextetStream
+{
+public:
+	virtual ~InputHandler_SextetStreamFromSelectFile();
+
+	// Note: The configured filename (the `SextetStreamInputFilename`
+	// setting) is passed to open(), not a RageFile ctor, so specify the
+	// file to be opened on the actual filesystem instead of the mapped
+	// filesystem.
+	InputHandler_SextetStreamFromSelectFile();
+};
+#endif // !defined(WIN32)
 
 #endif
 
