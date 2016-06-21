@@ -130,8 +130,9 @@ In `Preferences.ini`, set:
     InputDrivers=X11,SextetStreamFromSelectFile
     SextetStreamInputFilename=Data/StepMania-Input-SextetStream.in
 
-(This also keeps X11-based keyboard input enabled. The X11 part can be
-removed later after setting up input mappings, if desired.)
+(This also keeps the default keyboard input enabled. The `X11` part can
+be removed later after setting up input mappings, if desired. For Mac OS
+X, replace `X11` with `HID`.)
 
 Create the FIFO:
 
