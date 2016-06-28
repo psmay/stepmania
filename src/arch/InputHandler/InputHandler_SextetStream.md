@@ -4,9 +4,9 @@
 Explanation
 -----------
 
-These drivers accept button inputs encoded as SextetStream packets (see
-`src/Sextets/SextetStream.md`) from some other process over an input
-stream.
+Each of this set of drivers accepts button inputs encoded as
+SextetStream packets (see `src/Sextets/SextetStream.md` for general
+info) from some other process over an input stream.
 
 Available drivers
 -----------------
