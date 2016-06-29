@@ -51,6 +51,7 @@ list(APPEND SMDATA_SEXTETS_HPP
   "Sextets/IO/StdCFilePacketWriter.h"
   "Sextets/PacketBuffer.h"
   "Sextets/Packet.h"
+  "Sextets/Platform.h"
 )
 
 if(WIN32)
