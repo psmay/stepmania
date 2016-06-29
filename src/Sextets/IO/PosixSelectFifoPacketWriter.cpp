@@ -6,50 +6,163 @@
 
 #if defined(SEXTETS_HAS_POSIX)
 
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/select.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cstdio>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include "RageThreads.h"
 #include "RageLog.h"
-#include "RageUtil.h"
+
+namespace
+{
+	int OpenFd(const RString& filename)
+	{
+		int fd = open(filename.c_str(), O_WRONLY | O_NONBLOCK);
+
+		if(fd < 0) {
+			return -1;
+		}
+
+		return fd;
+	}
+
+	static const size_t timeout = 1000;
+}
 
 namespace
 {
 	using namespace Sextets;
 	using namespace Sextets::IO;
 
-	class PwImpl : public PosixSelectFifoPacketWriter
+	class Impl : public PosixSelectFifoPacketWriter
 	{
 	private:
-		RageFile * out;
+		int fd;
+		bool seenError;
+		RageMutex WritingLock;
 
-	public:
-		PwImpl(RageFile * stream)
+		volatile bool stopRequested;
+
+		bool shouldContinue()
 		{
-			out = stream;
+			return !stopRequested && IsReady() && !seenError;
 		}
 
-		~PwImpl()
+		bool writePacket0(const Packet& packet)
 		{
-			if(out != NULL) {
-				out->Flush();
-				out->Close();
-				SAFE_DELETE(out);
+			if(stopRequested) {
+				return false;
 			}
+
+			RString line = packet.GetLine();
+			size_t remaining = line.size();
+			const RString::value_type * data = line.data();
+
+			while(shouldContinue() && (remaining > 0)) {
+				struct timeval timeoutval = { 0, timeout * 1000 };
+				fd_set set;
+				FD_ZERO(&set);
+				FD_SET(fd, &set);
+
+				int event_count = select(fd + 1, NULL, &set, NULL, &timeoutval);
+
+				if(event_count == 0) {
+					// Timed out; check condition then keep waiting
+					continue;
+				} else if(event_count < 0) {
+					LOG->Warn("Problem waiting for write on stream: %s", std::strerror(errno));
+					seenError = true;
+					return false;
+				} else if(FD_ISSET(fd, &set)) {
+					// There may now be room on our stream
+					ssize_t count = write(fd, data, remaining);
+					if(count >= 0) {
+						// The write was successful (though it may have been empty).
+						data += count;
+						remaining -= count;
+					} else {
+						if(errno == EINTR) {
+							// Caught an interrupt, so recheck the condition
+							continue;
+						} else if((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
+							// Could not write this time, but try again
+							continue;
+						} else {
+							LOG->Warn("Problem writing to stream: %s", std::strerror(errno));
+							seenError = true;
+							return false;
+						}
+					}
+				}
+			}
+			return true;
+		}
+
+	public:
+		Impl(const RString& filename) : WritingLock("WritingLock")
+		{
+			stopRequested = false;
+
+			LOG->Info(
+				"Sextets POSIX select() FIFO packet writer opening stream from '%s' for output", filename.c_str());
+
+			fd = OpenFd(filename);
+			seenError = false;
+
+			if(!HasStream()) {
+				LOG->Warn(
+					"Sextets POSIX select() FIFO packet writer could not open stream from '%s' for output", filename.c_str());
+				return;
+			}
+		}
+
+		~Impl()
+		{
+			Close();
+		}
+
+		bool HasStream()
+		{
+			return fd >= 0;
 		}
 
 		bool IsReady()
 		{
-			return out != NULL;
+			return HasStream() && !stopRequested && !seenError;
 		}
 
 		bool WritePacket(const Packet& packet)
 		{
-			if(out != NULL) {
-				RString line = packet.GetLine();
-				out->PutLine(line);
-				out->Flush();
+			WritingLock.Lock();
+			bool result = writePacket0(packet);
+			WritingLock.Unlock();
 
-				return true;
-			}
-			return false;
+			return result;
 		}
+
+		void Close()
+		{
+			// If writing loop is underway, have it quit on the next pass
+			stopRequested = true;
+
+			// Wait until any writing loop has stopped
+			WritingLock.Lock();
+
+			// Close fd and mark closed
+			if(fd >= 0) {
+				close(fd);
+				fd = -1;
+			}
+
+			// Releaase lock
+			WritingLock.Unlock();
+		}
+
 	};
 }
 
@@ -59,23 +172,8 @@ namespace Sextets
 	{
 		PosixSelectFifoPacketWriter* PosixSelectFifoPacketWriter::Create(const RString& filename)
 		{
-			RageFile * file = new RageFile;
-
-			if(!file->Open(filename, RageFile::WRITE|RageFile::STREAMED)) {
-				LOG->Warn("Error opening file '%s' for output: %s", filename.c_str(), file->GetError().c_str());
-				SAFE_DELETE(file);
-				return NULL;
-			}
-
-			return PosixSelectFifoPacketWriter::Create(file);
-		}
-
-		PosixSelectFifoPacketWriter* PosixSelectFifoPacketWriter::Create(RageFile * stream)
-		{
-			if(stream == NULL) {
-				return NULL;
-			}
-			return new PwImpl(stream);
+			Impl * impl = new Impl(filename);
+			return impl->HasStream() ? impl : NULL;
 		}
 
 		PosixSelectFifoPacketWriter::~PosixSelectFifoPacketWriter() {}
