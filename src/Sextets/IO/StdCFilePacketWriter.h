@@ -1,31 +1,41 @@
-#ifndef Sextets_IO_EzSocketsPacketReader_h
-#define Sextets_IO_EzSocketsPacketReader_h
+#ifndef Sextets_IO_StdCFilePacketWriter_h
+#define Sextets_IO_StdCFilePacketWriter_h
 
-#include "global.h"
-#if !defined(WITHOUT_NETWORKING)
+// THIS IS ONLY A PLACEHOLDER
+// Don't expect this code to work (or even allow the entire program to work) in its current form.
 
-#include "Sextets/IO/PacketReader.h"
+#include "Sextets/IO/PacketWriter.h"
+#include "RageFile.h"
 
 namespace Sextets
 {
 	namespace IO
 	{
-		// PacketReader implementation using ezsockets
-		class EzSocketsPacketReader : public PacketReader
+		class StdCFilePacketWriter : public PacketWriter
 		{
-			public:
-				virtual ~EzSocketsPacketReader();
-				static EzSocketsPacketReader* Create(const RString& host, unsigned short port);
+		public:
+			virtual ~StdCFilePacketWriter();
+
+			// Note: If there is a problem opening the file, returns
+			// NULL.
+			static StdCFilePacketWriter * Create(const RString& filename);
+
+			// Note: If `stream` is `NULL`, returns `NULL`.
+			// When using this method, the RageFile should have been
+			// opened with the modes
+			// `RageFile::WRITE|RageFile::STREAMED` set. (This is not
+			// checked.) Additionally, the provided RageFile will be
+			// properly closed, flushed, and deleted when this packet
+			// writer is deleted.
+			static StdCFilePacketWriter * Create(RageFile * stream);
 		};
 	}
 }
 
-#endif // !defined(WITHOUT_NETWORKING)
-
 #endif
 
 /*
- * Copyright © 2016 Peter S. May
+ * Copyright © 2014-2016 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the

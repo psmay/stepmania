@@ -1,38 +1,35 @@
-#ifndef Sextets_IO_RageFilePacketWriter_h
-#define Sextets_IO_RageFilePacketWriter_h
+#ifndef Sextets_IO_WindowsOverlappedPipePacketReader_h
+#define Sextets_IO_WindowsOverlappedPipePacketReader_h
 
-#include "Sextets/IO/PacketWriter.h"
-#include "RageFile.h"
+// THIS IS ONLY A PLACEHOLDER
+// Don't expect this code to work (or even allow the entire program to work) in its current form.
+
+#include "global.h"
+
+#if defined(_WINDOWS)
+
+#include "Sextets/IO/PacketReader.h"
 
 namespace Sextets
 {
 	namespace IO
 	{
-		class RageFilePacketWriter : public PacketWriter
+		// PacketReader implementation using POSIX read() and select()
+		class WindowsOverlappedPipePacketReader : public PacketReader
 		{
-		public:
-			virtual ~RageFilePacketWriter();
-
-			// Note: If there is a problem opening the file, returns
-			// NULL.
-			static RageFilePacketWriter * Create(const RString& filename);
-
-			// Note: If `stream` is `NULL`, returns `NULL`.
-			// When using this method, the RageFile should have been
-			// opened with the modes
-			// `RageFile::WRITE|RageFile::STREAMED` set. (This is not
-			// checked.) Additionally, the provided RageFile will be
-			// properly closed, flushed, and deleted when this packet
-			// writer is deleted.
-			static RageFilePacketWriter * Create(RageFile * stream);
+			public:
+				virtual ~WindowsOverlappedPipePacketReader();
+				static WindowsOverlappedPipePacketReader* Create(const RString& filename);
 		};
 	}
 }
 
+#endif // !defined(_WINDOWS)
+
 #endif
 
 /*
- * Copyright © 2014-2016 Peter S. May
+ * Copyright © 2016 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the

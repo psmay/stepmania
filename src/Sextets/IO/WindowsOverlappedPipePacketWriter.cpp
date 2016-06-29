@@ -1,5 +1,10 @@
 
-#include "Sextets/IO/RageFilePacketWriter.h"
+
+// THIS IS ONLY A PLACEHOLDER
+// Don't expect this code to work (or even allow the entire program to work) in its current form.
+
+
+#include "Sextets/IO/WindowsOverlappedPipePacketWriter.h"
 #include "RageLog.h"
 #include "RageUtil.h"
 
@@ -8,7 +13,7 @@ namespace
 	using namespace Sextets;
 	using namespace Sextets::IO;
 
-	class PwImpl : public RageFilePacketWriter
+	class PwImpl : public WindowsOverlappedPipePacketWriter
 	{
 	private:
 		RageFile * out;
@@ -51,7 +56,7 @@ namespace Sextets
 {
 	namespace IO
 	{
-		RageFilePacketWriter* RageFilePacketWriter::Create(const RString& filename)
+		WindowsOverlappedPipePacketWriter* WindowsOverlappedPipePacketWriter::Create(const RString& filename)
 		{
 			RageFile * file = new RageFile;
 
@@ -61,10 +66,10 @@ namespace Sextets
 				return NULL;
 			}
 
-			return RageFilePacketWriter::Create(file);
+			return WindowsOverlappedPipePacketWriter::Create(file);
 		}
 
-		RageFilePacketWriter* RageFilePacketWriter::Create(RageFile * stream)
+		WindowsOverlappedPipePacketWriter* WindowsOverlappedPipePacketWriter::Create(RageFile * stream)
 		{
 			if(stream == NULL) {
 				return NULL;
@@ -72,7 +77,7 @@ namespace Sextets
 			return new PwImpl(stream);
 		}
 
-		RageFilePacketWriter::~RageFilePacketWriter() {}
+		WindowsOverlappedPipePacketWriter::~WindowsOverlappedPipePacketWriter() {}
 	}
 }
 

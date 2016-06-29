@@ -9,7 +9,7 @@
 
 #include "Sextets/IO/PacketWriter.h"
 #include "Sextets/IO/NoopPacketWriter.h"
-#include "Sextets/IO/RageFilePacketWriter.h"
+#include "Sextets/IO/StdCFilePacketWriter.h"
 #include "Sextets/Data.h"
 #include "Sextets/Packet.h"
 
@@ -106,7 +106,7 @@ LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
 	LOG->Flush();
 
 	PacketWriter * writer =
-		RageFilePacketWriter::Create(g_sSextetStreamOutputFilename);
+		StdCFilePacketWriter::Create(g_sSextetStreamOutputFilename);
 
 	if(writer == NULL) {
 		LOG->Warn("Create of packet writer for LightsDriver_SextetStreamToFile failed.");

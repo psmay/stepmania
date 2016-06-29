@@ -45,16 +45,6 @@ public:
 
 };
 
-#if !defined(WITHOUT_NETWORKING)
-class InputHandler_SextetStreamFromSocket: public InputHandler_SextetStream
-{
-public:
-	virtual ~InputHandler_SextetStreamFromSocket();
-	InputHandler_SextetStreamFromSocket();
-};
-#endif // !defined(WITHOUT_NETWORKING)
-
-
 #if !defined(WIN32)
 // Only for systems that support select() on ordinary files
 class InputHandler_SextetStreamFromSelectFile: public InputHandler_SextetStream

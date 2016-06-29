@@ -1,5 +1,5 @@
 
-#include "Sextets/IO/SelectFilePacketReader.h"
+#include "Sextets/IO/PosixSelectFifoPacketReader.h"
 
 // TODO: Determine which of these are actually necessary
 #include <sys/time.h>
@@ -36,7 +36,7 @@ namespace
 	using namespace Sextets;
 	using namespace Sextets::IO;
 
-	class Impl: public SelectFilePacketReader
+	class Impl: public PosixSelectFifoPacketReader
 	{
 	private:
 		// This buffer's size isn't critical since it is only used to
@@ -105,7 +105,7 @@ namespace
 
 		void CloseDueToStreamUnreadable()
 		{
-			LOG->Warn("SelectFilePacketReader: Closing because stream can no longer be read");
+			LOG->Warn("PosixSelectFifoPacketReader: Closing because stream can no longer be read");
 			Close();
 		}
 
@@ -219,12 +219,12 @@ namespace Sextets
 {
 	namespace IO
 	{
-		SelectFilePacketReader* SelectFilePacketReader::Create(const RString& filename)
+		PosixSelectFifoPacketReader* PosixSelectFifoPacketReader::Create(const RString& filename)
 		{
 			return new Impl(filename);
 		}
 		
-		SelectFilePacketReader::~SelectFilePacketReader() {}
+		PosixSelectFifoPacketReader::~PosixSelectFifoPacketReader() {}
 	}
 }
 
