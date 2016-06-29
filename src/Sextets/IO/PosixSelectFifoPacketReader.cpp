@@ -1,6 +1,8 @@
 
 #include "Sextets/IO/PosixSelectFifoPacketReader.h"
 
+#if defined(SEXTETS_HAS_POSIX)
+
 // TODO: Determine which of these are actually necessary
 #include <sys/time.h>
 #include <sys/types.h>
@@ -227,6 +229,8 @@ namespace Sextets
 		PosixSelectFifoPacketReader::~PosixSelectFifoPacketReader() {}
 	}
 }
+
+#endif // defined(SEXTETS_HAS_POSIX)
 
 /*
  * Copyright © 2016 Peter S. May

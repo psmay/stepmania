@@ -1,27 +1,16 @@
-#ifndef Sextets_IO_PosixSelectFifoPacketReader_h
-#define Sextets_IO_PosixSelectFifoPacketReader_h
 
-#include "Sextets/Platform.h"
+#ifndef Sextets_Platform_h
+#define Sextets_Platform_h
 
-#if defined(SEXTETS_HAS_POSIX)
+#include "global.h"
 
-#include "Sextets/IO/PacketReader.h"
+#if defined(WINDOWS)
+#define SEXTETS_HAS_WINDOWS
+#endif
 
-namespace Sextets
-{
-	namespace IO
-	{
-		// PacketReader implementation using POSIX read() and select()
-		class PosixSelectFifoPacketReader : public PacketReader
-		{
-			public:
-				virtual ~PosixSelectFifoPacketReader();
-				static PosixSelectFifoPacketReader* Create(const RString& filename);
-		};
-	}
-}
-
-#endif // defined(SEXTETS_HAS_POSIX)
+#if defined(LINUX) || defined(MACOSX)
+#define SEXTETS_HAS_POSIX
+#endif
 
 #endif
 

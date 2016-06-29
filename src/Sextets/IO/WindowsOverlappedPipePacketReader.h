@@ -4,9 +4,9 @@
 // THIS IS ONLY A PLACEHOLDER
 // Don't expect this code to work (or even allow the entire program to work) in its current form.
 
-#include "global.h"
+#include "Sextets/Platform.h"
 
-#if defined(_WINDOWS)
+#if defined(SEXTETS_HAS_WINDOWS)
 
 #include "Sextets/IO/PacketReader.h"
 
@@ -24,7 +24,7 @@ namespace Sextets
 	}
 }
 
-#endif // !defined(_WINDOWS)
+#endif // defined(SEXTETS_HAS_WINDOWS)
 
 #endif
 

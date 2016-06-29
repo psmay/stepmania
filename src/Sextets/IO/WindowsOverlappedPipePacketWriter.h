@@ -4,8 +4,11 @@
 // THIS IS ONLY A PLACEHOLDER
 // Don't expect this code to work (or even allow the entire program to work) in its current form.
 
+#include "Sextets/Platform.h"
+
+#if defined(SEXTETS_HAS_WINDOWS)
+
 #include "Sextets/IO/PacketWriter.h"
-#include "RageFile.h"
 
 namespace Sextets
 {
@@ -31,6 +34,8 @@ namespace Sextets
 		};
 	}
 }
+
+#endif // defined(SEXTETS_HAS_WINDOWS)
 
 #endif
 

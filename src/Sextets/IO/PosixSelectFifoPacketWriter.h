@@ -1,8 +1,9 @@
 #ifndef Sextets_IO_PosixSelectFifoPacketWriter_h
 #define Sextets_IO_PosixSelectFifoPacketWriter_h
 
-// THIS IS ONLY A PLACEHOLDER
-// Don't expect this code to work (or even allow the entire program to work) in its current form.
+#include "Sextets/Platform.h"
+
+#if defined(SEXTETS_HAS_POSIX)
 
 #include "Sextets/IO/PacketWriter.h"
 #include "RageFile.h"
@@ -19,18 +20,11 @@ namespace Sextets
 			// Note: If there is a problem opening the file, returns
 			// NULL.
 			static PosixSelectFifoPacketWriter * Create(const RString& filename);
-
-			// Note: If `stream` is `NULL`, returns `NULL`.
-			// When using this method, the RageFile should have been
-			// opened with the modes
-			// `RageFile::WRITE|RageFile::STREAMED` set. (This is not
-			// checked.) Additionally, the provided RageFile will be
-			// properly closed, flushed, and deleted when this packet
-			// writer is deleted.
-			static PosixSelectFifoPacketWriter * Create(RageFile * stream);
 		};
 	}
 }
+
+#endif // defined(SEXTETS_HAS_POSIX)
 
 #endif
 

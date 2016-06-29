@@ -1,10 +1,11 @@
 
+#include "Sextets/IO/PosixSelectFifoPacketWriter.h"
 
 // THIS IS ONLY A PLACEHOLDER
 // Don't expect this code to work (or even allow the entire program to work) in its current form.
 
+#if defined(SEXTETS_HAS_POSIX)
 
-#include "Sextets/IO/PosixSelectFifoPacketWriter.h"
 #include "RageLog.h"
 #include "RageUtil.h"
 
@@ -80,6 +81,8 @@ namespace Sextets
 		PosixSelectFifoPacketWriter::~PosixSelectFifoPacketWriter() {}
 	}
 }
+
+#endif // defined(SEXTETS_HAS_POSIX)
 
 /*
  * Copyright © 2014-2016 Peter S. May
