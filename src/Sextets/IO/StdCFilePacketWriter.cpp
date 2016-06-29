@@ -1,50 +1,72 @@
 
 #include "Sextets/IO/StdCFilePacketWriter.h"
-#include "RageLog.h"
-#include "RageUtil.h"
 
-// THIS IS ONLY A PLACEHOLDER
-// Don't expect this code to work (or even allow the entire program to work) in its current form.
+#include "RageLog.h"
+#include <cerrno>
+#include <cstdio>
 
 namespace
 {
 	using namespace Sextets;
 	using namespace Sextets::IO;
 
-	class PwImpl : public StdCFilePacketWriter
+	class Impl : public StdCFilePacketWriter
 	{
 	private:
-		RageFile * out;
+		std::FILE * file;
 
 	public:
-		PwImpl(RageFile * stream)
+		Impl(std::FILE * stream)
 		{
-			out = stream;
+			LOG->Info("Starting Sextets packet writer from open std::FILE");
+			file = stream;
 		}
 
-		~PwImpl()
+		Impl(const RString& filename)
 		{
-			if(out != NULL) {
-				out->Flush();
-				out->Close();
-				SAFE_DELETE(out);
+			LOG->Info("Starting Sextets packet writer from std::FILE with filename '%s'",
+					  filename.c_str());
+
+			file = std::fopen(filename.c_str(), "wb");
+
+			if(file == NULL) {
+				LOG->Warn("Error opening file '%s' for output (cstdio): %s",
+						  filename.c_str(), std::strerror(errno));
+			} else {
+				LOG->Info("File opened");
+				// Disable buffering on the file
+				std::setbuf(file, NULL);
 			}
+		}
+
+		~Impl()
+		{
+			if(file != NULL) {
+				std::fclose(file);
+				file = NULL;
+			}
+		}
+
+		bool InitOk()
+		{
+			return file != NULL;
 		}
 
 		bool IsReady()
 		{
-			return out != NULL;
+			return file != NULL;
 		}
 
 		bool WritePacket(const Packet& packet)
 		{
-			if(out != NULL) {
+			if(file != NULL) {
 				RString line = packet.GetLine();
-				out->PutLine(line);
-				out->Flush();
+				std::fwrite(line.data(), sizeof(char), line.size(), file);
+				std::fflush(file);
 
 				return true;
 			}
+
 			return false;
 		}
 	};
@@ -54,25 +76,16 @@ namespace Sextets
 {
 	namespace IO
 	{
-		StdCFilePacketWriter* StdCFilePacketWriter::Create(const RString& filename)
+		StdCFilePacketWriter* StdCFilePacketWriter::Create(std::FILE * file)
 		{
-			RageFile * file = new RageFile;
-
-			if(!file->Open(filename, RageFile::WRITE|RageFile::STREAMED)) {
-				LOG->Warn("Error opening file '%s' for output: %s", filename.c_str(), file->GetError().c_str());
-				SAFE_DELETE(file);
-				return NULL;
-			}
-
-			return StdCFilePacketWriter::Create(file);
+			Impl * impl = new Impl(file);
+			return impl->InitOk() ? impl : NULL;
 		}
 
-		StdCFilePacketWriter* StdCFilePacketWriter::Create(RageFile * stream)
+		StdCFilePacketWriter* StdCFilePacketWriter::Create(const RString& filename)
 		{
-			if(stream == NULL) {
-				return NULL;
-			}
-			return new PwImpl(stream);
+			Impl * impl = new Impl(filename);
+			return impl->InitOk() ? impl : NULL;
 		}
 
 		StdCFilePacketWriter::~StdCFilePacketWriter() {}

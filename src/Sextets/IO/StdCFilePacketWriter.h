@@ -1,11 +1,7 @@
 #ifndef Sextets_IO_StdCFilePacketWriter_h
 #define Sextets_IO_StdCFilePacketWriter_h
 
-// THIS IS ONLY A PLACEHOLDER
-// Don't expect this code to work (or even allow the entire program to work) in its current form.
-
 #include "Sextets/IO/PacketWriter.h"
-#include "RageFile.h"
 
 namespace Sextets
 {
@@ -18,16 +14,8 @@ namespace Sextets
 
 			// Note: If there is a problem opening the file, returns
 			// NULL.
+			static StdCFilePacketWriter * Create(std::FILE * file);
 			static StdCFilePacketWriter * Create(const RString& filename);
-
-			// Note: If `stream` is `NULL`, returns `NULL`.
-			// When using this method, the RageFile should have been
-			// opened with the modes
-			// `RageFile::WRITE|RageFile::STREAMED` set. (This is not
-			// checked.) Additionally, the provided RageFile will be
-			// properly closed, flushed, and deleted when this packet
-			// writer is deleted.
-			static StdCFilePacketWriter * Create(RageFile * stream);
 		};
 	}
 }
