@@ -6,7 +6,6 @@
 #if defined(SEXTETS_HAS_POSIX)
 
 #include "Sextets/IO/PacketWriter.h"
-#include "RageFile.h"
 
 namespace Sextets
 {
@@ -17,8 +16,7 @@ namespace Sextets
 		public:
 			virtual ~PosixSelectFifoPacketWriter();
 
-			// Note: If there is a problem opening the file, returns
-			// NULL.
+			// Note: If there is a problem opening the file, returns NULL.
 			static PosixSelectFifoPacketWriter * Create(const RString& filename);
 		};
 	}

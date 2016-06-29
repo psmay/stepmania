@@ -1,9 +1,6 @@
 
 #include "Sextets/IO/PosixSelectFifoPacketWriter.h"
 
-// THIS IS ONLY A PLACEHOLDER
-// Don't expect this code to work (or even allow the entire program to work) in its current form.
-
 #if defined(SEXTETS_HAS_POSIX)
 
 #include <sys/time.h>
