@@ -1,35 +1,40 @@
 # To determine what to put in this file, run the following from src:
-#	#!/bin/sh
-#	
-# WINDOWS_TEST=('(' -name 'Windows*' ')')
-# POSIX_TEST=('(' -name 'Posix*' ')')
-# PLATFORM_INDEPENDENT_TEST=('(' -not '(' ${WINDOWS_TEST[@]} -o ${POSIX_TEST[@]} ')' ')')
-#	
-#	echo 'list(APPEND SMDATA_SEXTETS_SRC'
-#	find Sextets '(' -name '*.cpp' -a ${PLATFORM_INDEPENDENT_TEST[@]} ')' -exec echo '  "{}"' \; | sort
-#	echo ')'
-#	echo
-#	echo 'list(APPEND SMDATA_SEXTETS_HPP'
-#	find Sextets '(' -name '*.h' -a ${PLATFORM_INDEPENDENT_TEST[@]} ')' -exec echo '  "{}"' \; | sort
-#	echo ')'
-#	echo
-#	echo 'if(WIN32)'
-#	echo '  list(APPEND SMDATA_SEXTETS_SRC'
-#	find Sextets '(' -name '*.cpp' -a ${WINDOWS_TEST[@]} ')' -exec echo '    "{}"' \; | sort
-#	echo '  )'
-#	echo '  list(APPEND SMDATA_SEXTETS_HPP'
-#	find Sextets '(' -name '*.h' -a ${WINDOWS_TEST[@]} ')' -exec echo '    "{}"' \; | sort
-#	echo '  )'
-#	echo 'elseif(LINUX OR APPLE)'
-#	echo '  list(APPEND SMDATA_SEXTETS_SRC'
-#	find Sextets '(' -name '*.cpp' -a ${POSIX_TEST[@]} ')' -exec echo '    "{}"' \; | sort
-#	echo '  )'
-#	echo '  list(APPEND SMDATA_SEXTETS_HPP'
-#	find Sextets '(' -name '*.h' -a ${POSIX_TEST[@]} ')' -exec echo '    "{}"' \; | sort
-#	echo '  )'
-#	echo 'endif()'
-#	echo
-#	echo 'source_group("Sextets Support Library" FILES ${SMDATA_SEXTETS_SRC} ${SMDATA_SEXTETS_HPP})'
+#
+# sed '/^##\t/!d ; s/^##\t//g' < CMakeData-sextets.cmake | bash
+#
+# The above command runs the following script:
+#
+##	#!/bin/bash
+##	
+##	WINDOWS_TEST=('(' -name 'Windows*' ')')
+##	POSIX_TEST=('(' -name 'Posix*' ')')
+##	PLATFORM_INDEPENDENT_TEST=('(' -not '(' ${WINDOWS_TEST[@]} -o ${POSIX_TEST[@]} ')' ')')
+##	
+##	echo 'list(APPEND SMDATA_SEXTETS_SRC'
+##	find Sextets '(' -name '*.cpp' -a ${PLATFORM_INDEPENDENT_TEST[@]} ')' -exec echo '  "{}"' \; | sort
+##	echo ')'
+##	echo
+##	echo 'list(APPEND SMDATA_SEXTETS_HPP'
+##	find Sextets '(' -name '*.h' -a ${PLATFORM_INDEPENDENT_TEST[@]} ')' -exec echo '  "{}"' \; | sort
+##	echo ')'
+##	echo
+##	echo 'if(WIN32)'
+##	echo '  list(APPEND SMDATA_SEXTETS_SRC'
+##	find Sextets '(' -name '*.cpp' -a ${WINDOWS_TEST[@]} ')' -exec echo '    "{}"' \; | sort
+##	echo '  )'
+##	echo '  list(APPEND SMDATA_SEXTETS_HPP'
+##	find Sextets '(' -name '*.h' -a ${WINDOWS_TEST[@]} ')' -exec echo '    "{}"' \; | sort
+##	echo '  )'
+##	echo 'elseif(LINUX OR APPLE)'
+##	echo '  list(APPEND SMDATA_SEXTETS_SRC'
+##	find Sextets '(' -name '*.cpp' -a ${POSIX_TEST[@]} ')' -exec echo '    "{}"' \; | sort
+##	echo '  )'
+##	echo '  list(APPEND SMDATA_SEXTETS_HPP'
+##	find Sextets '(' -name '*.h' -a ${POSIX_TEST[@]} ')' -exec echo '    "{}"' \; | sort
+##	echo '  )'
+##	echo 'endif()'
+##	echo
+##	echo 'source_group("Sextets Support Library" FILES ${SMDATA_SEXTETS_SRC} ${SMDATA_SEXTETS_HPP})'
 
 list(APPEND SMDATA_SEXTETS_SRC
   "Sextets/Data.cpp"
