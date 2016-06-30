@@ -18,9 +18,6 @@ using namespace Sextets;
 using namespace Sextets::IO;
 
 
-
-
-
 // Implementation base class
 
 class LightsDriver_SextetStream::Impl
@@ -117,6 +114,32 @@ LightsDriver_SextetStreamToFile::LightsDriver_SextetStreamToFile()
 	// Impl() accounts for the case where writer is NULL.
 	_impl = new Impl(writer);
 }
+
+#if defined(SEXTETS_FIFO_WRITER)
+
+// LightsDriver_SextetStreamToFifo implementation
+
+REGISTER_LIGHTS_DRIVER_CLASS(SextetStreamToFifo);
+
+LightsDriver_SextetStreamToFifo::LightsDriver_SextetStreamToFifo()
+{
+	LOG->Info("Creating LightsDriver_SextetStreamToFifo");
+	LOG->Flush();
+
+	PacketWriter * writer =
+		SEXTETS_FIFO_WRITER::Create(g_sSextetStreamOutputFilename);
+
+	if(writer == NULL) {
+		LOG->Warn("Create of packet writer for LightsDriver_SextetStreamToFifo failed.");
+	} else {
+		LOG->Info("Create of packet writer for LightsDriver_SextetStreamToFifo OK.");
+	}
+
+	// Impl() accounts for the case where writer is NULL.
+	_impl = new Impl(writer);
+}
+
+#endif // defined(SEXTETS_FIFO_WRITER)
 
 /*
  * Copyright © 2014-2016 Peter S. May

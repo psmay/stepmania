@@ -5,11 +5,11 @@
 #include "global.h"
 
 #if defined(WINDOWS)
-#define SEXTETS_HAS_WINDOWS
+	#define SEXTETS_HAS_WINDOWS
 #endif
 
 #if defined(LINUX) || defined(MACOSX)
-#define SEXTETS_HAS_POSIX
+	#define SEXTETS_HAS_POSIX
 #endif
 
 #endif

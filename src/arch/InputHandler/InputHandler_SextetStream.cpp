@@ -7,7 +7,6 @@
 
 #include "Sextets/IO/PacketReader.h"
 #include "Sextets/IO/StdCFilePacketReader.h"
-#include "Sextets/IO/PosixSelectFifoPacketReader.h"
 #include "Sextets/Data.h"
 
 #include <cerrno>
@@ -177,7 +176,7 @@ void InputHandler_SextetStream::Update()
 
 REGISTER_INPUT_HANDLER_CLASS(SextetStreamFromFile);
 
-#if defined(_WINDOWS)
+#if defined(SEXTETS_HAS_WINDOWS)
 	#define DEFAULT_INPUT_FILENAME "\\\\.\\pipe\\StepMania-Input-SextetStream"
 #else
 	#define DEFAULT_INPUT_FILENAME "Data/StepMania-Input-SextetStream.in"
@@ -194,22 +193,23 @@ InputHandler_SextetStreamFromFile::~InputHandler_SextetStreamFromFile()
 }
 
 
-// SextetStreamFromSelectFile
 
-#if !defined(_WINDOWS)
+#if defined(SEXTETS_FIFO_READER)
 
-REGISTER_INPUT_HANDLER_CLASS(SextetStreamFromSelectFile);
+// SextetStreamFromFifo
 
-InputHandler_SextetStreamFromSelectFile::InputHandler_SextetStreamFromSelectFile()
+REGISTER_INPUT_HANDLER_CLASS(SextetStreamFromFifo);
+
+InputHandler_SextetStreamFromFifo::InputHandler_SextetStreamFromFifo()
 {
-	_impl = new InputHandler_SextetStream::Impl(this, PosixSelectFifoPacketReader::Create(g_sSextetStreamInputFilename));
+	_impl = new InputHandler_SextetStream::Impl(this, SEXTETS_FIFO_READER::Create(g_sSextetStreamInputFilename));
 }
 
-InputHandler_SextetStreamFromSelectFile::~InputHandler_SextetStreamFromSelectFile()
+InputHandler_SextetStreamFromFifo::~InputHandler_SextetStreamFromFifo()
 {
 }
 
-#endif
+#endif // defined(SEXTETS_FIFO_READER)
 
 
 /*

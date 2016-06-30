@@ -1,49 +1,28 @@
-#ifndef InputHandler_SextetStream_h
-#define InputHandler_SextetStream_h
 
-#include "InputHandler.h"
+#ifndef Sextets_IO_PlatformFifo_h
+#define Sextets_IO_PlatformFifo_h
 
-#include "Sextets/IO/PlatformFifo.h"
+#include "Sextets/Platform.h"
 
-#include <cstdio>
-
-#include "Sextets/IO/PacketReaderEventGenerator.h"
-
-class InputHandler_SextetStream: public InputHandler
-{
-public:
-	InputHandler_SextetStream();
-	virtual ~InputHandler_SextetStream();
-	virtual void Update();
-	virtual void GetDevicesAndDescriptions(vector<InputDeviceInfo>& vDevicesOut);
-
-public:
-	class Impl;
-	friend class Impl;
-protected:
-	Impl * _impl;
-};
-
-class InputHandler_SextetStreamFromFile: public InputHandler_SextetStream
-{
-public:
-	virtual ~InputHandler_SextetStreamFromFile();
-	InputHandler_SextetStreamFromFile();
-};
-
-#if defined(SEXTETS_FIFO_READER)
-class InputHandler_SextetStreamFromFifo: public InputHandler_SextetStream
-{
-public:
-	virtual ~InputHandler_SextetStreamFromFifo();
-	InputHandler_SextetStreamFromFifo();
-};
-#endif // defined(SEXTETS_FIFO_READER)
+#if defined(SEXTETS_HAS_WINDOWS)
+	#include "Sextets/IO/WindowsOverlappedPipePacketReader.h"
+	#include "Sextets/IO/WindowsOverlappedPipePacketWriter.h"
+	#define SEXTETS_FIFO_READER Sextets::IO::WindowsOverlappedPipePacketReader
+	#define SEXTETS_FIFO_WRITER Sextets::IO::WindowsOverlappedPipePacketWriter
+#elif defined(SEXTETS_HAS_POSIX)
+	#include "Sextets/IO/PosixSelectFifoPacketReader.h"
+	#include "Sextets/IO/PosixSelectFifoPacketWriter.h"
+	#define SEXTETS_FIFO_READER Sextets::IO::PosixSelectFifoPacketReader
+	#define SEXTETS_FIFO_WRITER Sextets::IO::PosixSelectFifoPacketWriter
+#else
+	#undef SEXTETS_FIFO_READER
+	#undef SEXTETS_FIFO_WRITER
+#endif
 
 #endif
 
 /*
- * Copyright © 2014-2016 Peter S. May
+ * Copyright © 2016 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the

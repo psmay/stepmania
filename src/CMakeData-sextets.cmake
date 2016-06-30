@@ -47,6 +47,7 @@ list(APPEND SMDATA_SEXTETS_HPP
   "Sextets/IO/PacketReaderEventGenerator.h"
   "Sextets/IO/PacketReader.h"
   "Sextets/IO/PacketWriter.h"
+  "Sextets/IO/PlatformFifo.h"
   "Sextets/IO/StdCFilePacketReader.h"
   "Sextets/IO/StdCFilePacketWriter.h"
   "Sextets/PacketBuffer.h"
