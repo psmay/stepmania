@@ -31,6 +31,7 @@ public:
 	Impl(PacketWriter * writer)
 	{
 		if(writer == NULL) {
+			LOG->Warn("PacketWriter was NULL; replacing with no-op writer");
 			writer = new NoopPacketWriter();
 		}
 		this->writer = writer;
@@ -39,6 +40,7 @@ public:
 	virtual ~Impl()
 	{
 		if(writer != NULL) {
+			LOG->Info("Deleting writer");
 			delete writer;
 			writer = NULL;
 		}

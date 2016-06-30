@@ -14,16 +14,37 @@ namespace
 	{
 	private:
 		std::FILE * file;
+		bool seenError;
+
+		bool writeRString(const RString& str)
+		{
+			const void * data = str.data();
+			size_t length = str.size() * sizeof(RString::value_type);
+
+			size_t writtenLength = std::fwrite(data, sizeof(RString::value_type), length, file);
+
+			return (writtenLength == length);
+		}
+
+		bool flush()
+		{
+			int flushFailed = std::fflush(file);
+			return !flushFailed;
+		}
 
 	public:
 		Impl(std::FILE * stream)
 		{
+			seenError = false;
+
 			LOG->Info("Starting Sextets packet writer from open std::FILE");
 			file = stream;
 		}
 
 		Impl(const RString& filename)
 		{
+			seenError = false;
+
 			LOG->Info("Starting Sextets packet writer from std::FILE with filename '%s'",
 					  filename.c_str());
 
@@ -54,17 +75,26 @@ namespace
 
 		bool IsReady()
 		{
-			return file != NULL;
+			return (file != NULL) && !seenError;
 		}
 
 		bool WritePacket(const Packet& packet)
 		{
-			if(file != NULL) {
-				RString line = packet.GetLine();
-				std::fwrite(line.data(), sizeof(char), line.size(), file);
-				std::fflush(file);
+			if(IsReady()) {
+				RString line = packet.GetLine() + "\n";
 
-				return true;
+				bool b = writeRString(line);
+				if(b) {
+					if(!flush()) {
+						LOG->Warn("Flush error; packet write failed");
+						seenError = true;
+					}
+				} else {
+					LOG->Warn("Write error; packet write failed");
+					seenError = true;
+				}
+
+				return !seenError;
 			}
 
 			return false;

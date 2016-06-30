@@ -56,7 +56,7 @@ namespace
 				return false;
 			}
 
-			RString line = packet.GetLine();
+			RString line = packet.GetLine() + "\n";
 			size_t remaining = line.size();
 			const RString::value_type * data = line.data();
 
