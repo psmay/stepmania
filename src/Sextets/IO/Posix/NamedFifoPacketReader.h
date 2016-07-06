@@ -1,9 +1,9 @@
-#ifndef Sextets_IO_PosixSelectFifoPacketReader_h
-#define Sextets_IO_PosixSelectFifoPacketReader_h
+#ifndef Sextets_IO_Posix_NamedFifoPacketReader_h
+#define Sextets_IO_Posix_NamedFifoPacketReader_h
 
 #include "Sextets/Platform.h"
 
-#if defined(SEXTETS_HAS_POSIX)
+#if defined(SEXTETS_HAVE_POSIX)
 
 #include "Sextets/IO/PacketReader.h"
 
@@ -11,17 +11,20 @@ namespace Sextets
 {
 	namespace IO
 	{
-		// PacketReader implementation using POSIX read() and select()
-		class PosixSelectFifoPacketReader : public PacketReader
+		namespace Posix
 		{
-			public:
-				virtual ~PosixSelectFifoPacketReader();
-				static PosixSelectFifoPacketReader* Create(const RString& filename);
-		};
+			// PacketReader implementation using POSIX read() and select()
+			class NamedFifoPacketReader : public PacketReader
+			{
+				public:
+					virtual ~NamedFifoPacketReader();
+					static NamedFifoPacketReader* Create(const RString& filename);
+			};
+		}
 	}
 }
 
-#endif // defined(SEXTETS_HAS_POSIX)
+#endif // defined(SEXTETS_HAVE_POSIX)
 
 #endif
 

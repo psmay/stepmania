@@ -1,35 +1,36 @@
-#ifndef Sextets_IO_WindowsOverlappedPipePacketReader_h
-#define Sextets_IO_WindowsOverlappedPipePacketReader_h
-
-// THIS IS ONLY A PLACEHOLDER
-// Don't expect this code to work (or even allow the entire program to work) in its current form.
+#ifndef Sextets_IO_Windows_NamedFifoPacketWriter_h
+#define Sextets_IO_Windows_NamedFifoPacketWriter_h
 
 #include "Sextets/Platform.h"
 
-#if defined(SEXTETS_HAS_WINDOWS)
+#if defined(SEXTETS_HAVE_WINDOWS)
 
-#include "Sextets/IO/PacketReader.h"
+#include "Sextets/IO/PacketWriter.h"
 
 namespace Sextets
 {
 	namespace IO
 	{
-		// PacketReader implementation using POSIX read() and select()
-		class WindowsOverlappedPipePacketReader : public PacketReader
+		namespace Windows
 		{
-			public:
-				virtual ~WindowsOverlappedPipePacketReader();
-				static WindowsOverlappedPipePacketReader* Create(const RString& filename);
-		};
+			class NamedFifoPacketWriter : public PacketWriter
+			{
+				public:
+					virtual ~NamedFifoPacketWriter();
+
+					// Note: If there is a problem opening the file, returns NULL.
+					static NamedFifoPacketWriter * Create(const RString& filename);
+			};
+		}
 	}
 }
 
-#endif // defined(SEXTETS_HAS_WINDOWS)
+#endif // defined(SEXTETS_HAVE_WINDOWS)
 
 #endif
 
 /*
- * Copyright © 2016 Peter S. May
+ * Copyright © 2014-2016 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the

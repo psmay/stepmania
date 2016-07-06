@@ -4,16 +4,16 @@
 
 #include "Sextets/Platform.h"
 
-#if defined(SEXTETS_HAS_WINDOWS)
-	#include "Sextets/IO/WindowsOverlappedPipePacketReader.h"
-	#include "Sextets/IO/WindowsOverlappedPipePacketWriter.h"
-	#define SEXTETS_FIFO_READER Sextets::IO::WindowsOverlappedPipePacketReader
-	#define SEXTETS_FIFO_WRITER Sextets::IO::WindowsOverlappedPipePacketWriter
-#elif defined(SEXTETS_HAS_POSIX)
-	#include "Sextets/IO/PosixSelectFifoPacketReader.h"
-	#include "Sextets/IO/PosixSelectFifoPacketWriter.h"
-	#define SEXTETS_FIFO_READER Sextets::IO::PosixSelectFifoPacketReader
-	#define SEXTETS_FIFO_WRITER Sextets::IO::PosixSelectFifoPacketWriter
+#if defined(SEXTETS_HAVE_WINDOWS)
+	#include "Sextets/IO/Windows/NamedFifoPacketReader.h"
+	#include "Sextets/IO/Windows/NamedFifoPacketWriter.h"
+	#define SEXTETS_FIFO_READER Sextets::IO::Windows::NamedFifoPacketReader
+	#define SEXTETS_FIFO_WRITER Sextets::IO::Windows::NamedFifoPacketWriter
+#elif defined(SEXTETS_HAVE_POSIX)
+	#include "Sextets/IO/Posix/NamedFifoPacketReader.h"
+	#include "Sextets/IO/Posix/NamedFifoPacketWriter.h"
+	#define SEXTETS_FIFO_READER Sextets::IO::Posix::NamedFifoPacketReader
+	#define SEXTETS_FIFO_WRITER Sextets::IO::Posix::NamedFifoPacketWriter
 #else
 	#undef SEXTETS_FIFO_READER
 	#undef SEXTETS_FIFO_WRITER

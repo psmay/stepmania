@@ -7,28 +7,28 @@
 
 class LightsDriver_SextetStream : public LightsDriver
 {
-public:
-	LightsDriver_SextetStream();
-	virtual ~LightsDriver_SextetStream();
-	virtual void Set(const LightsState *ls);
+	public:
+		LightsDriver_SextetStream();
+		virtual ~LightsDriver_SextetStream();
+		virtual void Set(const LightsState *ls);
 
-public:
-	class Impl;
-protected:
-	Impl * _impl;
+	public:
+		class Impl;
+	protected:
+		Impl * _impl;
 };
 
 class LightsDriver_SextetStreamToFile : public LightsDriver_SextetStream
 {
-public:
-	LightsDriver_SextetStreamToFile();
+	public:
+		LightsDriver_SextetStreamToFile();
 };
 
 #if defined(SEXTETS_FIFO_WRITER)
 class LightsDriver_SextetStreamToFifo : public LightsDriver_SextetStream
 {
-public:
-	LightsDriver_SextetStreamToFifo();
+	public:
+		LightsDriver_SextetStreamToFifo();
 };
 #endif // defined(SEXTETS_FIFO_WRITER)
 

@@ -1,33 +1,35 @@
-#ifndef Sextets_IO_PosixSelectFifoPacketWriter_h
-#define Sextets_IO_PosixSelectFifoPacketWriter_h
+#ifndef Sextets_IO_Windows_NamedFifoPacketReader_h
+#define Sextets_IO_Windows_NamedFifoPacketReader_h
 
 #include "Sextets/Platform.h"
 
-#if defined(SEXTETS_HAS_POSIX)
+#if defined(SEXTETS_HAVE_WINDOWS)
 
-#include "Sextets/IO/PacketWriter.h"
+#include "Sextets/IO/PacketReader.h"
 
 namespace Sextets
 {
 	namespace IO
 	{
-		class PosixSelectFifoPacketWriter : public PacketWriter
+		namespace Windows
 		{
-		public:
-			virtual ~PosixSelectFifoPacketWriter();
-
-			// Note: If there is a problem opening the file, returns NULL.
-			static PosixSelectFifoPacketWriter * Create(const RString& filename);
-		};
+			// PacketReader implementation using Windows OVERLAPPED and named pipes
+			class NamedFifoPacketReader : public PacketReader
+			{
+				public:
+					virtual ~NamedFifoPacketReader();
+					static NamedFifoPacketReader* Create(const RString& filename);
+			};
+		}
 	}
 }
 
-#endif // defined(SEXTETS_HAS_POSIX)
+#endif // defined(SEXTETS_HAVE_WINDOWS)
 
 #endif
 
 /*
- * Copyright © 2014-2016 Peter S. May
+ * Copyright © 2016 Peter S. May
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the

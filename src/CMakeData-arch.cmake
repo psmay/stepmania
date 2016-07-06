@@ -260,16 +260,11 @@ source_group("Arch Specific\\\\Loading Window" FILES ${SMDATA_ARCH_LOADING_SRC} 
 list(APPEND SMDATA_ARCH_LIGHTS_SRC
   "arch/Lights/LightsDriver.cpp"
   "arch/Lights/LightsDriver_SystemMessage.cpp"
+  "arch/Lights/LightsDriver_SextetStream.cpp"
 )
 list(APPEND SMDATA_ARCH_LIGHTS_HPP
   "arch/Lights/LightsDriver.h"
   "arch/Lights/LightsDriver_SystemMessage.h"
-)
-
-list(APPEND SMDATA_ARCH_LIGHTS_SRC
-  "arch/Lights/LightsDriver_SextetStream.cpp"
-)
-list(APPEND SMDATA_ARCH_LIGHTS_HPP
   "arch/Lights/LightsDriver_SextetStream.h"
 )
 
@@ -336,10 +331,12 @@ source_group("Arch Specific\\\\Lights" FILES ${SMDATA_ARCH_LIGHTS_SRC} ${SMDATA_
 list(APPEND SMDATA_ARCH_INPUT_SRC
   "arch/InputHandler/InputHandler.cpp"
   "arch/InputHandler/InputHandler_MonkeyKeyboard.cpp"
+  "arch/InputHandler/InputHandler_SextetStream.cpp"
 )
 list(APPEND SMDATA_ARCH_INPUT_HPP
   "arch/InputHandler/InputHandler.h"
   "arch/InputHandler/InputHandler_MonkeyKeyboard.h"
+  "arch/InputHandler/InputHandler_SextetStream.h"
 )
 
 if(WIN32)
@@ -357,14 +354,6 @@ if(WIN32)
     "arch/InputHandler/InputHandler_Win32_Para.h"
     "arch/InputHandler/InputHandler_Win32_Pump.h"
   )
-  if (NOT MSVC)
-    list(APPEND SMDATA_ARCH_INPUT_SRC
-      "arch/InputHandler/InputHandler_SextetStream.cpp"
-    )
-    list(APPEND SMDATA_ARCH_INPUT_HPP
-      "arch/InputHandler/InputHandler_SextetStream.h"
-    )
-  endif()
 elseif(APPLE)
   list(APPEND SMDATA_ARCH_INPUT_SRC
     "arch/InputHandler/InputHandler_MacOSX_HID.cpp"
@@ -379,14 +368,12 @@ else() # Unix/Linux
       "arch/InputHandler/InputHandler_Linux_Joystick.cpp"
       "arch/InputHandler/InputHandler_Linux_Event.cpp"
       "arch/InputHandler/InputHandler_Linux_PIUIO.cpp"
-      "arch/InputHandler/InputHandler_SextetStream.cpp"
     )
     list(APPEND SMDATA_ARCH_INPUT_SRC
       "arch/InputHandler/LinuxInputManager.h"
       "arch/InputHandler/InputHandler_Linux_Joystick.h"
       "arch/InputHandler/InputHandler_Linux_Event.h"
       "arch/InputHandler/InputHandler_Linux_PIUIO.h"
-      "arch/InputHandler/InputHandler_SextetStream.h"
     )
     if(WITH_TTY)
       list(APPEND SMDATA_ARCH_INPUT_SRC

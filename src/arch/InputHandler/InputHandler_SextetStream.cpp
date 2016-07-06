@@ -61,90 +61,89 @@ namespace
 
 class InputHandler_SextetStream::Impl
 {
-private:
-	Packet currentStatePacket, nextStatePacket;
-	InputHandler_SextetStream * handler;
-	PacketReaderEventGenerator * eventGenerator;
-	InputDevice id;
-	RageMutex statePacketsLock;
+	private:
+		Packet currentStatePacket, nextStatePacket;
+		InputHandler_SextetStream * handler;
+		PacketReaderEventGenerator * eventGenerator;
+		InputDevice id;
+		RageMutex statePacketsLock;
 
-	static void TriggerSetButtonState(void * p, size_t index, bool value)
-	{
-		((Impl*)p)->SetButtonState(index, value);
-	}
-
-	static void TriggerOnReadPacket(void * p, const Packet& packet)
-	{
-		((Impl*)p)->OnReadPacket(packet);
-	}
-
-	void SetButtonState(size_t index, bool value)
-	{
-		DeviceInput di = DeviceInput(id, ButtonAtIndex(index), value ? 1 : 0);
-		handler->ButtonPressed(di);
-	}
-
-	void OnReadPacket(const Packet& newStatePacket)
-	{
-		statePacketsLock.Lock();
-		nextStatePacket = newStatePacket;
-		statePacketsLock.Unlock();
-	}
-
-	inline void Update0()
-	{
-		Packet changesPacket;
-
-		changesPacket.SetToXor(currentStatePacket, nextStatePacket);
-
-		if(changesPacket.IsEmpty()) {
-			// No updates needed
-			return;
+		static void TriggerSetButtonState(void * p, size_t index, bool value)
+		{
+			((Impl*)p)->SetButtonState(index, value);
 		}
 
-		// Trigger button updates
-		nextStatePacket.ProcessEventData(changesPacket, BUTTON_COUNT, this, TriggerSetButtonState);
-
-		// Must be called at end of Update (cargo cult style).
-		handler->InputHandler::UpdateTimer();
-
-		currentStatePacket = nextStatePacket;
-	}
-
-public:
-	Impl(InputHandler_SextetStream * handler, PacketReader * packetReader) :
-		statePacketsLock("InputHandler_SextetStream")
-	{
-		LOG->Info("Number of button states supported by current InputHandler_SextetStream: %u",
-				  (unsigned)BUTTON_COUNT);
-
-		this->handler = handler;
-
-		eventGenerator = PacketReaderEventGenerator::Create(packetReader, (void*) this, TriggerOnReadPacket);
-
-		if(eventGenerator == NULL) {
-			LOG->Warn("Failed to get PacketReader event generator; this input handler is disabled.");
+		static void TriggerOnReadPacket(void * p, const Packet& packet)
+		{
+			((Impl*)p)->OnReadPacket(packet);
 		}
 
-		id = InputDevice(FIRST_DEVICE);
-	}
-
-	virtual ~Impl()
-	{
-		if(eventGenerator != NULL) {
-			delete eventGenerator;
-			eventGenerator = NULL;
+		void SetButtonState(size_t index, bool value)
+		{
+			DeviceInput di = DeviceInput(id, ButtonAtIndex(index), value ? 1 : 0);
+			handler->ButtonPressed(di);
 		}
-	}
+
+		void OnReadPacket(const Packet& newStatePacket)
+		{
+			statePacketsLock.Lock();
+			nextStatePacket = newStatePacket;
+			statePacketsLock.Unlock();
+		}
+
+		inline void Update0()
+		{
+			Packet changesPacket;
+
+			changesPacket.SetToXor(currentStatePacket, nextStatePacket);
+
+			if(changesPacket.IsEmpty()) {
+				// No updates needed
+				return;
+			}
+
+			// Trigger button updates
+			nextStatePacket.ProcessEventData(changesPacket, BUTTON_COUNT, this, TriggerSetButtonState);
+
+			// Must be called at end of Update (cargo cult style).
+			handler->InputHandler::UpdateTimer();
+
+			currentStatePacket = nextStatePacket;
+		}
+
+	public:
+		Impl(InputHandler_SextetStream * handler, PacketReader * packetReader) :
+			statePacketsLock("InputHandler_SextetStream")
+		{
+			LOG->Info("Number of button states supported by current InputHandler_SextetStream: %u",
+					  (unsigned)BUTTON_COUNT);
+
+			this->handler = handler;
+
+			eventGenerator = PacketReaderEventGenerator::Create(packetReader, (void*) this, TriggerOnReadPacket);
+
+			if(eventGenerator == NULL) {
+				LOG->Warn("Failed to get PacketReader event generator; this input handler is disabled.");
+			}
+
+			id = InputDevice(FIRST_DEVICE);
+		}
+
+		virtual ~Impl()
+		{
+			if(eventGenerator != NULL) {
+				delete eventGenerator;
+				eventGenerator = NULL;
+			}
+		}
 
 
-	void Update()
-	{
-		statePacketsLock.Lock();
-		Update0();
-		statePacketsLock.Unlock();
-	}
-
+		void Update()
+		{
+			statePacketsLock.Lock();
+			Update0();
+			statePacketsLock.Unlock();
+		}
 };
 
 // ctor and dtor of InputHandler_SextetStream.
@@ -176,7 +175,7 @@ void InputHandler_SextetStream::Update()
 
 REGISTER_INPUT_HANDLER_CLASS(SextetStreamFromFile);
 
-#if defined(SEXTETS_HAS_WINDOWS)
+#if defined(SEXTETS_HAVE_WINDOWS)
 	#define DEFAULT_INPUT_FILENAME "\\\\.\\pipe\\StepMania-Input-SextetStream"
 #else
 	#define DEFAULT_INPUT_FILENAME "Data/StepMania-Input-SextetStream.in"

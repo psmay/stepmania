@@ -1,12 +1,10 @@
-#ifndef Sextets_IO_WindowsOverlappedPipePacketWriter_h
-#define Sextets_IO_WindowsOverlappedPipePacketWriter_h
 
-// THIS IS ONLY A PLACEHOLDER
-// Don't expect this code to work (or even allow the entire program to work) in its current form.
+#ifndef Sextets_IO_Posix_NamedFifoPacketWriter_h
+#define Sextets_IO_Posix_NamedFifoPacketWriter_h
 
 #include "Sextets/Platform.h"
 
-#if defined(SEXTETS_HAS_WINDOWS)
+#if defined(SEXTETS_HAVE_POSIX)
 
 #include "Sextets/IO/PacketWriter.h"
 
@@ -14,28 +12,21 @@ namespace Sextets
 {
 	namespace IO
 	{
-		class WindowsOverlappedPipePacketWriter : public PacketWriter
+		namespace Posix
 		{
-		public:
-			virtual ~WindowsOverlappedPipePacketWriter();
+			class NamedFifoPacketWriter : public PacketWriter
+			{
+				public:
+					virtual ~NamedFifoPacketWriter();
 
-			// Note: If there is a problem opening the file, returns
-			// NULL.
-			static WindowsOverlappedPipePacketWriter * Create(const RString& filename);
-
-			// Note: If `stream` is `NULL`, returns `NULL`.
-			// When using this method, the RageFile should have been
-			// opened with the modes
-			// `RageFile::WRITE|RageFile::STREAMED` set. (This is not
-			// checked.) Additionally, the provided RageFile will be
-			// properly closed, flushed, and deleted when this packet
-			// writer is deleted.
-			static WindowsOverlappedPipePacketWriter * Create(RageFile * stream);
-		};
+					// Note: If there is a problem opening the file, returns NULL.
+					static NamedFifoPacketWriter * Create(const RString& filename);
+			};
+		}
 	}
 }
 
-#endif // defined(SEXTETS_HAS_WINDOWS)
+#endif // defined(SEXTETS_HAVE_POSIX)
 
 #endif
 

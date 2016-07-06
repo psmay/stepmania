@@ -6,8 +6,8 @@
 #
 ##	#!/bin/bash
 ##	
-##	WINDOWS_TEST=('(' -name 'Windows*' ')')
-##	POSIX_TEST=('(' -name 'Posix*' ')')
+##	WINDOWS_TEST=('(' -path '*/Windows/*.*' ')')
+##	POSIX_TEST=('(' -path '*/Posix/*.*' ')')
 ##	PLATFORM_INDEPENDENT_TEST=('(' -not '(' ${WINDOWS_TEST[@]} -o ${POSIX_TEST[@]} ')' ')')
 ##	
 ##	echo 'list(APPEND SMDATA_SEXTETS_SRC'
@@ -62,21 +62,21 @@ list(APPEND SMDATA_SEXTETS_HPP
 
 if(WIN32)
   list(APPEND SMDATA_SEXTETS_SRC
-    "Sextets/IO/WindowsOverlappedPipePacketReader.cpp"
-    "Sextets/IO/WindowsOverlappedPipePacketWriter.cpp"
+    "Sextets/IO/Windows/NamedFifoPacketReader.cpp"
+    "Sextets/IO/Windows/NamedFifoPacketWriter.cpp"
   )
   list(APPEND SMDATA_SEXTETS_HPP
-    "Sextets/IO/WindowsOverlappedPipePacketReader.h"
-    "Sextets/IO/WindowsOverlappedPipePacketWriter.h"
+    "Sextets/IO/Windows/NamedFifoPacketReader.h"
+    "Sextets/IO/Windows/NamedFifoPacketWriter.h"
   )
 elseif(LINUX OR APPLE)
   list(APPEND SMDATA_SEXTETS_SRC
-    "Sextets/IO/PosixSelectFifoPacketReader.cpp"
-    "Sextets/IO/PosixSelectFifoPacketWriter.cpp"
+    "Sextets/IO/Posix/NamedFifoPacketReader.cpp"
+    "Sextets/IO/Posix/NamedFifoPacketWriter.cpp"
   )
   list(APPEND SMDATA_SEXTETS_HPP
-    "Sextets/IO/PosixSelectFifoPacketReader.h"
-    "Sextets/IO/PosixSelectFifoPacketWriter.h"
+    "Sextets/IO/Posix/NamedFifoPacketReader.h"
+    "Sextets/IO/Posix/NamedFifoPacketWriter.h"
   )
 endif()
 
