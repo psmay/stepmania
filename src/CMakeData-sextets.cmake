@@ -62,10 +62,12 @@ list(APPEND SMDATA_SEXTETS_HPP
 
 if(WIN32)
   list(APPEND SMDATA_SEXTETS_SRC
+    "Sextets/IO/Windows/_BasicOverlappedNamedPipe.cpp"
     "Sextets/IO/Windows/NamedFifoPacketReader.cpp"
     "Sextets/IO/Windows/NamedFifoPacketWriter.cpp"
   )
   list(APPEND SMDATA_SEXTETS_HPP
+    "Sextets/IO/Windows/_BasicOverlappedNamedPipe.h"
     "Sextets/IO/Windows/NamedFifoPacketReader.h"
     "Sextets/IO/Windows/NamedFifoPacketWriter.h"
   )
