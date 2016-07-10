@@ -1,4 +1,8 @@
 
+#include "Sextets/IO/PlatformFifo.h"
+
+#if defined(SEXTETS_HAVE_WINDOWS)
+
 #include "Sextets/IO/Windows/_BasicOverlappedNamedPipe.h"
 
 #include <windows.h>
@@ -166,7 +170,7 @@ namespace
 			{
 				bool ready = false;
 
-				if(!HasHandle()) {
+				if(!IsOpen()) {
 					LOG->Info("Pipe is already closed");
 				} else if(seenError.get()) {
 					LOG->Warn("Closing pipe handle due to reported errors");
@@ -356,7 +360,7 @@ namespace
 				}
 			}
 
-			bool HasHandle()
+			bool IsOpen()
 			{
 				return ph != INVALID_HANDLE_VALUE;
 			}
@@ -364,7 +368,7 @@ namespace
 			bool IsReady()
 			{
 				// This must be identical to readyOrClose(), except that no closing and no log messages take place.
-				return HasHandle() && !(seenError.get() || seenEof.get() || shutdownRequested.get());
+				return IsOpen() && !(seenError.get() || seenEof.get() || shutdownRequested.get());
 			}
 
 			void Close()
@@ -405,7 +409,7 @@ namespace
 
 			// If any data is available immediately, read it. Else, do a read of
 			// one byte.
-			bool Read(void * buffer, size_t bufferLength, size_t& receivedLength)
+			bool Read(void * buffer, size_t bufferLength, size_t& receivedLengthOut)
 			{
 				// Reasoning: While this may be paranoia, the way I read it, the
 				// overlapped ReadFile() call is allowed to wait to complete
@@ -459,7 +463,7 @@ namespace
 					readLen = 1;
 				}
 
-				return readToLength(buffer, readLen, receivedLength);
+				return readToLength(buffer, readLen, receivedLengthOut);
 			}
 	};
 }
@@ -474,7 +478,7 @@ namespace Sextets
 			_BasicOverlappedNamedPipe * _BasicOverlappedNamedPipe::Create(const RString& pipePath, bool forRead, bool forWrite)
 			{
 				Impl * impl = new Impl(pipePath, forRead, forWrite);
-				if(impl->HasHandle()) {
+				if(impl->IsOpen()) {
 					return impl;
 				}
 				return NULL;
@@ -482,6 +486,8 @@ namespace Sextets
 		}
 	}
 }
+
+#endif // defined(SEXTETS_HAVE_WINDOWS)
 
 /*
 * Copyright © 2016 Peter S. May

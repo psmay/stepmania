@@ -3,6 +3,9 @@
 #define Sextets_IO_Windows__BasicOverlappedNamedPipe_h
 
 #include "global.h"
+#include "Sextets/Platform.h"
+
+#if defined(SEXTETS_HAVE_WINDOWS)
 
 namespace Sextets
 {
@@ -36,14 +39,17 @@ namespace Sextets
 			// - the pipe was never opened
 			// - the pipe has already been closed
 			//
-			// HasHandle() returns true unless the pipe was never opened or has
+			// IsOpen() returns true unless the pipe was never opened or has
 			// already been closed.
 			class _BasicOverlappedNamedPipe
 			{
 				public:
 					virtual ~_BasicOverlappedNamedPipe() {}
-					virtual bool HasHandle() = 0;
-					virtual bool Read(void * buffer, size_t bufferLength, size_t& receivedLength) = 0;
+					virtual bool IsOpen() = 0;
+
+					// If any data is available immediately, read it. Else, do a
+					// read of one byte.
+					virtual bool Read(void * buffer, size_t bufferLength, size_t& receivedLengthOut) = 0;
 					virtual bool Write(const void * data, size_t dataLength, size_t& sentLengthOut) = 0;
 					virtual void RequestClose() = 0;
 					virtual void Close() = 0;
@@ -60,6 +66,8 @@ namespace Sextets
 
 
 #endif // Sextets_IO_Windows__BasicOverlappedNamedPipe_h
+
+#endif // defined(SEXTETS_HAVE_WINDOWS)
 
 /*
 * Copyright © 2016 Peter S. May

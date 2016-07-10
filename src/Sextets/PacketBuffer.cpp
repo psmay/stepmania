@@ -46,150 +46,141 @@ namespace
 
 	class ActualPacketBuffer : public PacketBuffer
 	{
-	private:
-		std::queue<RString> lines;
-		RString buffer;
+		private:
+			std::queue<RString> lines;
+			RString buffer;
 
-		// If true, all data through the next newline will be discarded.
-		// This is set where continuing a line after a mid-line error would
-		// ruin the alignment of the data on the line.
-		bool needsResync;
+			// If true, all data through the next newline will be discarded.
+			// This is set where continuing a line after a mid-line error would
+			// ruin the alignment of the data on the line.
+			bool needsResync;
 
-		void RequestResync()
-		{
-			needsResync = true;
-		}
+			void RequestResync()
+			{
+				needsResync = true;
+			}
 
-		// If needsResync, attempts to find and erase to the first newline
-		// character in the buffer. If successful, needsResync is set to
-		// false. Returns whether the buffer is now synced (which is
-		// !needsResync).
-		bool SyncBuffer()
-		{
-			if(needsResync) {
-				if(EraseToFirstOf(buffer, ASCII_NEWLINE_CHARS)) {
-					// Newline found; buffer erased up to newline to sync
-					needsResync = false;
-					return true;
-				} else {
-					// No newline found
-					buffer.clear();
+			// If needsResync, attempts to find and erase to the first newline
+			// character in the buffer. If successful, needsResync is set to
+			// false. Returns whether the buffer is now synced (which is
+			// !needsResync).
+			bool SyncBuffer()
+			{
+				if(needsResync) {
+					if(EraseToFirstOf(buffer, ASCII_NEWLINE_CHARS)) {
+						// Newline found; buffer erased up to newline to sync
+						needsResync = false;
+						return true;
+					} else {
+						// No newline found
+						buffer.clear();
+						return false;
+					}
+				}
+				return true;
+			}
+
+			void PushLine(const RString& line)
+			{
+				if(!line.empty()) {
+					lines.push(line);
+				}
+			}
+
+			// Splits the buffer into lines.
+			void BreakBuffer()
+			{
+				while(!buffer.empty() && SyncBuffer()) {
+
+					// First newline
+					size_t newlineIndex = buffer.find_first_of(ASCII_NEWLINE_CHARS);
+					// First invalid char
+					size_t invalidIndex = buffer.find_first_not_of(SIMPLE_CHARS);
+
+					size_t len = (newlineIndex != RString::npos) ? newlineIndex : buffer.length();
+
+					// An invalid character is seen within the current line's
+					// portion of the buffer.
+					if(invalidIndex != RString::npos && (invalidIndex < len)) {
+						// Discard line in progress up to next newline
+						RequestResync();
+						LOG->Warn(
+							"Sextets PacketBuffer encountered a line "
+							"that contains an invalid character. "
+							"The current line will be discarded.");
+						continue;
+					}
+
+					// The current line's portion of the buffer is too long.
+					if(len > LINE_MAX_LENGTH) {
+						// Take the beginning, then discard the rest of the line
+						PushLine(buffer.substr(0, LINE_MAX_LENGTH));
+						RequestResync();
+						buffer.clear();
+						LOG->Warn(
+							"Sextets PacketBuffer encountered a line "
+							"that is longer than the allowed maximum "
+							"length (%d). The current line has been "
+							"truncated.", (unsigned)LINE_MAX_LENGTH);
+						continue;
+					}
+
+					// The buffer contains a newline and otherwise looks OK.
+					if(newlineIndex != RString::npos) {
+						PushLine(buffer.substr(0, newlineIndex));
+						EraseTo(buffer, newlineIndex, 1);
+						continue;
+					}
+
+					// The buffer doesn't contain a newline.
+					return;
+				}
+			}
+
+		public:
+			ActualPacketBuffer() : needsResync(false)
+			{
+			}
+
+			~ActualPacketBuffer()
+			{
+			}
+
+			void Add(const void * data, size_t length)
+			{
+				const char * chrData = (const char *)data;
+
+				buffer.append(chrData, length);
+				BreakBuffer();
+			}
+
+			void Add(const RString& data)
+			{
+				buffer.append(data);
+				BreakBuffer();
+			}
+
+			bool HasPacket()
+			{
+				return !lines.empty();
+			}
+
+			bool GetPacket(Packet& packet)
+			{
+				if(lines.empty()) {
 					return false;
 				}
-			}
-			return true;
-		}
 
-		void PushLine(const RString& line)
-		{
-			if(!line.empty()) {
-				lines.push(line);
-			}
-		}
+				packet.SetToLine(lines.front());
+				lines.pop();
 
-		// Splits the buffer into lines.
-		void BreakBuffer()
-		{
-			while(!buffer.empty() && SyncBuffer()) {
-
-				// First newline
-				size_t newlineIndex = buffer.find_first_of(ASCII_NEWLINE_CHARS);
-				// First invalid char
-				size_t invalidIndex = buffer.find_first_not_of(SIMPLE_CHARS);
-
-				size_t len = (newlineIndex != RString::npos) ? newlineIndex : buffer.length();
-
-				// An invalid character is seen within the current line's
-				// portion of the buffer.
-				if(invalidIndex != RString::npos && (invalidIndex < len))
-				{
-					// Discard line in progress up to next newline
-					RequestResync();
-					LOG->Warn(
-						"Sextets PacketBuffer encountered a line "
-						"that contains an invalid character. "
-						"The current line will be discarded.");
-					continue;
-				}
-
-				// The current line's portion of the buffer is too long.
-				if(len > LINE_MAX_LENGTH) {
-					// Take the beginning, then discard the rest of the line
-					PushLine(buffer.substr(0, LINE_MAX_LENGTH));
-							RequestResync();
-							buffer.clear();
-							LOG->Warn(
-								"Sextets PacketBuffer encountered a line "
-								"that is longer than the allowed maximum "
-								"length (%d). The current line has been "
-								"truncated.", (unsigned)LINE_MAX_LENGTH);
-							continue;
-				}
-
-				// The buffer contains a newline and otherwise looks OK.
-				if(newlineIndex != RString::npos) {
-					PushLine(buffer.substr(0, newlineIndex));
-					EraseTo(buffer, newlineIndex, 1);
-					continue;
-				}
-
-				// The buffer doesn't contain a newline.
-				return;
-			}
-		}
-
-	public:
-		ActualPacketBuffer() : needsResync(false)
-		{
-		}
-
-		~ActualPacketBuffer()
-		{
-		}
-
-		void Add(const RChr * data, size_t length)
-		{
-			buffer.append(data, length);
-			BreakBuffer();
-		}
-
-		void Add(const RString& data)
-		{
-			buffer.append(data);
-			BreakBuffer();
-		}
-
-		void Add(const uint8_t * data, size_t length)
-		{
-			size_t start = buffer.length();
-			buffer.resize(start + length);
-			for(size_t i = 0; i < length; ++i) {
-				buffer[start + i] = (RChr)(data[i]);
-			}
-			BreakBuffer();
-		}
-
-		bool HasPacket()
-		{
-			return !lines.empty();
-		}
-
-		bool GetPacket(Packet& packet)
-		{
-			if(lines.empty()) {
-				return false;
+				return true;
 			}
 
-			packet.SetToLine(lines.front());
-			lines.pop();
-
-			return true;
-		}
-
-		void DiscardUnfinished()
-		{
-			RequestResync();
-		}
+			void DiscardUnfinished()
+			{
+				RequestResync();
+			}
 	};
 }
 
