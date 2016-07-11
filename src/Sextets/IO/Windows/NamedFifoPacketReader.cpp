@@ -55,8 +55,14 @@ namespace
 				if(isReadyNoSync()) {
 					size_t readLen;
 					if(stream->Read(buffer, BUFFER_SIZE, readLen)) {
+						// Read succeeded. See if there is a new packet; if
+						// there is, respond with it. Otherwise, send an empty
+						// packet.
 						pb->Add(buffer, readLen);
-						return pb->GetPacket(packet);
+						if(!pb->GetPacket(packet)) {
+							packet.Clear();
+						}
+						return true;
 					} else {
 						// Read failed
 						return false;
@@ -120,11 +126,11 @@ namespace Sextets
 			NamedFifoPacketReader* NamedFifoPacketReader::Create(const RString& filename)
 			{
 				Impl * impl = new Impl(filename);
-				if(impl->HasStream()) {
-					return impl;
+				if(!impl->HasStream()) {
+					delete impl;
+					return NULL;
 				}
-				delete impl;
-				return NULL;
+				return impl;
 			}
 
 			NamedFifoPacketReader::~NamedFifoPacketReader() {}

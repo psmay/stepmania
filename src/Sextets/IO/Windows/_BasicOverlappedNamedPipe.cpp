@@ -478,10 +478,11 @@ namespace Sextets
 			_BasicOverlappedNamedPipe * _BasicOverlappedNamedPipe::Create(const RString& pipePath, bool forRead, bool forWrite)
 			{
 				Impl * impl = new Impl(pipePath, forRead, forWrite);
-				if(impl->IsOpen()) {
-					return impl;
+				if(!impl->IsOpen()) {
+					delete impl;
+					return NULL;
 				}
-				return NULL;
+				return impl;
 			}
 		}
 	}
