@@ -11,10 +11,11 @@ namespace
 	class PacketReaderEventGeneratorImpl : public PacketReaderEventGenerator
 	{
 		private:
-			PacketReader * packetReader;
+			PacketReader * volatile packetReader;
+			RageMutex packetReaderLock;
 			void * context;
 			PacketReaderEventGenerator::PacketReaderEventCallback * onReadPacket;
-			bool continueThread;
+			bool stopRequested;
 			volatile bool threadStarted;
 			volatile bool threadEnded;
 			RageThread thread;
@@ -26,14 +27,14 @@ namespace
 
 			inline void CreateThread()
 			{
-				continueThread = true;
+				stopRequested = false;
 				thread.SetName("Sextets PacketReaderEventGenerator thread");
 				thread.Create(StartThread, this);
 			}
 
 			static int StartThread(void * p)
 			{
-				((PacketReaderEventGeneratorImpl *) p)->RunThread();
+				((PacketReaderEventGeneratorImpl *)p)->RunThread();
 				return 0;
 			}
 
@@ -41,11 +42,13 @@ namespace
 			{
 				LOG->Trace("Disposing Sextets PacketReaderEventGenerator");
 
+				packetReaderLock.Lock();
 				if(packetReader != NULL) {
 					LOG->Trace("Deleting packet reader");
 					delete packetReader;
 					packetReader = NULL;
 				}
+				packetReaderLock.Unlock();
 
 				context = NULL;
 
@@ -58,27 +61,35 @@ namespace
 				threadStarted = true;
 
 				LOG->Info("Sextets PacketReaderEventGenerator thread started");
-				
-				while(continueThread) {
+
+				while(!stopRequested) {
 					Packet packet;
+					bool gotPacket = false;
 
 					LOG->Trace("Reading packet");
 
-					if(packetReader->ReadPacket(packet)) {
+					packetReaderLock.Lock();
+					if(packetReader == NULL) {
+						stopRequested = true;
+					} else {
+						gotPacket = packetReader->ReadPacket(packet);
+					}
+					packetReaderLock.Unlock();
+
+					if(!stopRequested && gotPacket) {
 						LOG->Trace("Got packet: '%s'", packet.GetLine().c_str());
+						LOG->Trace("Read packet length: %u", (unsigned)packet.SextetCount());
+
 						if(packet.IsEmpty()) {
 							LOG->Trace("Packet was blank; not calling callback");
-							LOG->Trace("Read packet length: %u", (unsigned) packet.SextetCount());
-						}
-						else {
+						} else {
 							LOG->Trace("Calling callback");
 							CallOnReadPacket(packet);
 						}
-					}
-					else {
+					} else {
 						// Error or EOF
 						LOG->Info("Sextets PacketReader input ended");
-						continueThread = false;
+						stopRequested = true;
 					}
 				}
 
@@ -94,12 +105,13 @@ namespace
 				PacketReader * packetReader,
 				void * context,
 				PacketReaderEventGenerator::PacketReaderEventCallback *	onReadPacket)
+				: packetReaderLock("PacketReaderEventGeneratorImpl::packetReaderLock")
 			{
 				// Checks already performed in Create().
 				this->packetReader = packetReader;
 				this->context = context;
 				this->onReadPacket = onReadPacket;
-				continueThread = false;
+				stopRequested = false;
 				threadStarted = false;
 				threadEnded = false;
 				CreateThread();
@@ -108,7 +120,7 @@ namespace
 			~PacketReaderEventGeneratorImpl()
 			{
 				if(thread.IsCreated()) {
-					continueThread = false;
+					stopRequested = true;
 					LOG->Trace("Event generator waiting for thread to end");
 					thread.Wait();
 				}
@@ -127,7 +139,7 @@ namespace
 
 			void RequestStop()
 			{
-				continueThread = false;
+				stopRequested = true;
 			}
 	};
 }
@@ -137,21 +149,19 @@ namespace Sextets
 	namespace IO
 	{
 		PacketReaderEventGenerator * PacketReaderEventGenerator::Create(
-				PacketReader * packetReader,
-				void * context,
-				PacketReaderEventGenerator::PacketReaderEventCallback * onReadPacket)
+			PacketReader * packetReader,
+			void * context,
+			PacketReaderEventGenerator::PacketReaderEventCallback * onReadPacket)
 		{
 
 			if(packetReader == NULL) {
 				LOG->Warn("Cannot create event generator: packetReader cannot be NULL.");
 				return NULL;
-			}
-			else if(onReadPacket == NULL) {
+			} else if(onReadPacket == NULL) {
 				LOG->Warn("Cannot create event generator: onReadPacket cannot be NULL. Destroying packet reader.");
 				delete packetReader;
 				return NULL;
-			}
-			else {
+			} else {
 				return new PacketReaderEventGeneratorImpl(packetReader, context, onReadPacket);
 			}
 		}
