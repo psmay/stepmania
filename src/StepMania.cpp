@@ -79,6 +79,12 @@ void ShutdownGame();
 bool HandleGlobalInputs( const InputEventPlus &input );
 void HandleInputEvents(float fDeltaTime);
 
+// If input is discarded while StepMania is not in focus, SextetStream input
+// programs using the keyboard (in particular the keyboard-based
+// SextetInputTest) do not work (at least in Windows). For everything else, this
+// should be false.
+static Preference<bool> g_bAllowNonFocusInput( "AllowNonFocusInput", false );
+
 static Preference<bool> g_bAllowMultipleInstances( "AllowMultipleInstances", false );
 
 void StepMania::GetPreferredVideoModeParams( VideoModeParams &paramsOut )
@@ -1508,8 +1514,8 @@ void HandleInputEvents(float fDeltaTime)
 	vector<InputEvent> ieArray;
 	INPUTFILTER->GetInputEvents( ieArray );
 
-	// If we don't have focus, discard input.
-	if( !HOOKS->AppHasFocus() )
+	// If we don't have focus, discard input (unless specifically allowed to accept it).
+	if( !g_bAllowNonFocusInput.Get() && !HOOKS->AppHasFocus() )
 		return;
 
 	for( unsigned i=0; i<ieArray.size(); i++ )
