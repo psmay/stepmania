@@ -48,6 +48,7 @@ enum InputDevice
 	DEVICE_MIDI,
 	DEVICE_MOUSE,
 	DEVICE_PIUIO,
+	DEVICE_SEXTETSTREAM,
 	NUM_InputDevice,		// leave this at the end
 	InputDevice_Invalid		// means this is NULL
 };

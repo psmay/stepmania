@@ -20,7 +20,7 @@ using namespace Sextets::IO;
 // In so many words, ceil(n/6).
 #define NUMBER_OF_SEXTETS_FOR_BIT_COUNT(n) (((n) + 5) / 6)
 
-#define FIRST_DEVICE DEVICE_JOY1
+#define FIRST_DEVICE DEVICE_SEXTETSTREAM
 
 #define FIRST_JOY_BUTTON JOY_BUTTON_1
 #define LAST_JOY_BUTTON JOY_BUTTON_32
