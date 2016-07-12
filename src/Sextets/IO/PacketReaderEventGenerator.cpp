@@ -40,11 +40,11 @@ namespace
 
 			void Invalidate()
 			{
-				LOG->Trace("Disposing Sextets PacketReaderEventGenerator");
+				//LOG->Trace("Disposing Sextets PacketReaderEventGenerator");
 
 				packetReaderLock.Lock();
 				if(packetReader != NULL) {
-					LOG->Trace("Deleting packet reader");
+					//LOG->Trace("Deleting packet reader");
 					delete packetReader;
 					packetReader = NULL;
 				}
@@ -66,7 +66,7 @@ namespace
 					Packet packet;
 					bool gotPacket = false;
 
-					LOG->Trace("Reading packet");
+					//LOG->Trace("Reading packet");
 
 					packetReaderLock.Lock();
 					if(packetReader == NULL) {
@@ -77,13 +77,10 @@ namespace
 					packetReaderLock.Unlock();
 
 					if(!stopRequested && gotPacket) {
-						LOG->Trace("Got packet: '%s'", packet.GetLine().c_str());
-						LOG->Trace("Read packet length: %u", (unsigned)packet.SextetCount());
-
 						if(packet.IsEmpty()) {
-							LOG->Trace("Packet was blank; not calling callback");
+							//LOG->Trace("Packet was blank; not calling callback");
 						} else {
-							LOG->Trace("Calling callback");
+							//LOG->Trace("Calling callback");
 							CallOnReadPacket(packet);
 						}
 					} else {
@@ -121,7 +118,7 @@ namespace
 			{
 				if(thread.IsCreated()) {
 					stopRequested = true;
-					LOG->Trace("Event generator waiting for thread to end");
+					//LOG->Trace("Event generator waiting for thread to end");
 					thread.Wait();
 				}
 				Invalidate();
